@@ -1,0 +1,177 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Bebas+Neue&family=JetBrains+Mono:wght@400;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 224 76% 48%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 224 76% 48%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 224 76% 48%;
+    --radius: 0.75rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    overflow-x: hidden;
+  }
+
+  body {
+    overflow-x: hidden;
+    @apply bg-slate-50 text-zff-black font-sans antialiased;
+    background-image:
+      radial-gradient(ellipse at 20% 10%, rgba(21,128,61,0.04) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 80%, rgba(59,130,246,0.03) 0%, transparent 50%);
+  }
+
+  ::-webkit-scrollbar { @apply w-1.5 h-1.5; }
+  ::-webkit-scrollbar-track { @apply bg-slate-100; }
+  ::-webkit-scrollbar-thumb { @apply bg-slate-300 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-zff-green/50; }
+}
+
+@layer components {
+  /* ── Cards ── */
+  .glass-card {
+    @apply bg-white border border-zff-black-border rounded-2xl shadow-glass;
+  }
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300 hover:border-zff-green/20 hover:shadow-card-hover;
+  }
+
+  /* ── Rank badges ── */
+  .rank-badge {
+    @apply inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold shrink-0;
+  }
+  .rank-1 { @apply bg-yellow-100 text-yellow-700 border border-yellow-300; }
+  .rank-2 { @apply bg-slate-100 text-slate-600 border border-slate-300; }
+  .rank-3 { @apply bg-amber-100 text-amber-700 border border-amber-300; }
+
+  /* ── Live badge ── */
+  .live-badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-100 text-red-600 text-xs font-bold
+           rounded-full border border-red-200 animate-live-pulse;
+  }
+
+  /* ── Pitch slots ── */
+  .formation-slot {
+    @apply relative flex flex-col items-center justify-center w-16 h-20 sm:w-20 sm:h-24 rounded-xl
+           border-2 border-dashed cursor-pointer transition-all duration-200;
+  }
+  .formation-slot-empty {
+    @apply border-slate-300 text-slate-400 hover:border-zff-green/50 hover:text-zff-green/60;
+  }
+  .formation-slot-filled {
+    @apply border-zff-green/40 bg-zff-green/5;
+  }
+
+  /* ── Sidebar links ── */
+  .sidebar-link {
+    @apply flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium text-slate-500
+           transition-all duration-200 hover:text-zff-black hover:bg-slate-100;
+  }
+  .sidebar-link-active {
+    @apply sidebar-link bg-zff-green/10 text-zff-green border border-zff-green/20 shadow-green-glow;
+  }
+
+  /* ── Table rows ── */
+  .data-table-row {
+    @apply border-b border-zff-black-border hover:bg-slate-50 transition-colors duration-150;
+  }
+
+  /* ── Standard table cell padding ── */
+  .td { @apply px-5 py-4; }
+  .th { @apply px-5 py-3.5 text-xs font-semibold text-muted-foreground; }
+
+  /* ── Buttons ── */
+  .btn-primary {
+    @apply bg-zff-green hover:bg-zff-green-dark text-white font-semibold px-6 py-2.5 rounded-xl
+           transition-all duration-200 shadow-green-glow hover:shadow-green-glow-lg active:scale-95;
+  }
+  .btn-outline {
+    @apply border border-zff-green/30 text-zff-green hover:bg-zff-green/10 font-medium px-6 py-2.5
+           rounded-xl transition-all duration-200;
+  }
+
+  /* ── Inputs ── */
+  .input {
+    @apply w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-zff-black
+           placeholder:text-slate-400 focus:outline-none focus:border-zff-green/50
+           focus:ring-2 focus:ring-zff-green/10 text-sm transition-colors;
+  }
+  .input-with-icon { @apply input pl-10; }
+
+  /* ── Selects ── */
+  .select {
+    @apply w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-zff-black
+           focus:outline-none focus:border-zff-green/50 focus:ring-2 focus:ring-zff-green/10
+           text-sm transition-colors appearance-none cursor-pointer pr-9;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+  }
+  /* compact variant for inline use (e.g. role picker in table rows) */
+  .select-sm {
+    @apply border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-xs text-zff-black
+           focus:outline-none focus:border-zff-green/50 appearance-none cursor-pointer pr-6;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 5px center;
+  }
+
+  /* ── Form labels ── */
+  .label {
+    @apply block text-xs font-semibold text-slate-600 mb-2 uppercase tracking-wide;
+  }
+
+  /* ── Page headers ── */
+  .section-header { @apply text-2xl font-bold text-zff-black; }
+  .section-subtitle { @apply text-sm text-muted-foreground mt-0.5; }
+
+  /* ── Position badges ── */
+  .pos-badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-lg border text-[10px] font-bold;
+  }
+
+  /* ── Stat pill ── */
+  .stat-chip {
+    @apply flex flex-col items-center gap-0.5;
+  }
+}
+
+@layer utilities {
+  .text-gradient-green {
+    @apply bg-gradient-to-r from-zff-green to-zff-green-light bg-clip-text text-transparent;
+  }
+  .text-gradient-gold {
+    @apply bg-gradient-to-r from-yellow-500 to-amber-500 bg-clip-text text-transparent;
+  }
+  .pitch-bg {
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 40px,
+        rgba(21,128,61,0.03) 40px, rgba(21,128,61,0.03) 41px),
+      repeating-linear-gradient(90deg, transparent, transparent 40px,
+        rgba(21,128,61,0.02) 40px, rgba(21,128,61,0.02) 41px);
+  }
+}
