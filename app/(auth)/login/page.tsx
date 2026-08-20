@@ -17,6 +17,7 @@ function safeRedirect(next: string | null): string {
 function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [slowLoading, setSlowLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ identifier: "", password: "" });
   const router       = useRouter();
@@ -27,12 +28,15 @@ function LoginForm() {
     : null;
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault(); setLoading(true); setError(null);
+    e.preventDefault(); setLoading(true); setSlowLoading(false); setError(null);
+    const slowTimer = setTimeout(() => setSlowLoading(true), 3000);
 
     const result = await signInWithIdentifierAction(form.identifier, form.password);
+    clearTimeout(slowTimer);
     if (result.error) {
       setError(result.error);
       setLoading(false);
+      setSlowLoading(false);
       return;
     }
     router.push(nextPath);
@@ -82,6 +86,9 @@ function LoginForm() {
             </button>
           </div>
         </div>
+        {slowLoading && (
+          <p className="text-xs text-center text-muted-foreground">Still working — this can take a few seconds…</p>
+        )}
         <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2 py-3">
           {loading ? "Signing in..." : <><span>Sign In</span><ArrowRight className="w-4 h-4" /></>}
         </button>

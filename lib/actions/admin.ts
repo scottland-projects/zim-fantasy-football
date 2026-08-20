@@ -57,6 +57,29 @@ async function requireAdminOrManager() {
   return { error: null, supabase };
 }
 
+// Real auth emails aren't on `profiles` (and shouldn't be — see the
+// column-level REVOKE on profiles.phone for the same PII-exposure reason),
+// so the admin Users list previously fabricated a fake `@…demo` address
+// from the username instead of showing the account's actual sign-in email.
+// This fetches the real ones via the service role, admin-gated.
+export async function listUserEmailsAction() {
+  const { error } = await requireAdmin();
+  if (error) return { error, emails: {} as Record<string, string> };
+
+  const admin = serviceRole();
+  const emails: Record<string, string> = {};
+  let page = 1;
+  // Cap at 20 pages (2,000 users) — enough for realistic scale without
+  // unbounded work if the user base grows very large.
+  for (; page <= 20; page++) {
+    const { data, error: listErr } = await admin.auth.admin.listUsers({ page, perPage: 100 });
+    if (listErr || !data?.users?.length) break;
+    for (const u of data.users) if (u.email) emails[u.id] = u.email;
+    if (data.users.length < 100) break;
+  }
+  return { error: null, emails };
+}
+
 export async function saveFlagsAction(flags: Record<string, boolean>) {
   const { error, supabase } = await requireAdmin();
   if (error || !supabase) return { error: error ?? "Unknown error" };

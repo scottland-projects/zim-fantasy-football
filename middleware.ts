@@ -4,6 +4,14 @@ import type { NextRequest } from "next/server";
 
 const PUBLIC_PATHS = ["/login", "/register", "/onboarding", "/privacy", "/terms", "/forgot-password", "/reset-password", "/auth/callback"];
 
+// Subset of PUBLIC_PATHS that an ALREADY-AUTHENTICATED user should be
+// bounced away from (back to /dashboard) — the sign-in/sign-up pages.
+// Everything else in PUBLIC_PATHS (onboarding, privacy, terms, auth
+// callback) must stay reachable while logged in: onboarding is only ever
+// visited by a freshly-authenticated user, and privacy/terms are ordinary
+// pages a logged-in user can legitimately want to read.
+const AUTH_ONLY_PATHS = ["/login", "/register", "/forgot-password", "/reset-password"];
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -57,11 +65,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Authenticated user hitting auth pages → send to app. /auth/callback is
-  // excluded: it must always run its own exchange-and-redirect logic, even
-  // for an already-authenticated user (e.g. confirming an email change or
-  // following a fresh magic link while a prior session is still active).
-  if (user && isPublic && pathname !== "/" && pathname !== "/auth/callback") {
+  // Authenticated user hitting a sign-in/sign-up page → send to app.
+  const isAuthOnly = AUTH_ONLY_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  if (user && isAuthOnly) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);

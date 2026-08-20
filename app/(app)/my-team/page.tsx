@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 import { cn, formatPrice, getPositionColor } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { saveTeam } from "@/lib/actions/team";
 import type { Player } from "@/lib/supabase/types";
 
 const FORMATIONS: Record<string, { GK: number; DEF: number; MID: number; FWD: number }> = {
@@ -31,6 +32,7 @@ export default function MyTeamPage() {
   const [captainMode, setCaptainMode]   = useState<"none" | "captain" | "vice">("none");
   const [saving, setSaving]             = useState(false);
   const [saveStatus, setSaveStatus]     = useState<"idle" | "success" | "error">("idle");
+  const [saveError, setSaveError]       = useState<string>("");
   const [dragId, setDragId]             = useState<string | null>(null);
   const [showHelp, setShowHelp]         = useState(false);
   const [allPlayers, setAllPlayers]     = useState<Player[]>([]);
@@ -106,7 +108,12 @@ export default function MyTeamPage() {
     [allPlayers, selectedIds]
   );
 
-  const totalCost   = selectedPlayers.reduce((sum, p) => sum + p.price, 0);
+  // Budget must reflect the cost of the FULL owned squad (all 15), not just
+  // the current starting XI — bench players cost real money too, and this
+  // is what save_fantasy_team validates against server-side. totalPoints
+  // intentionally stays scoped to the starting XI: bench players don't
+  // score, so a "current squad points" preview should match that.
+  const totalCost   = squadPlayers.reduce((sum, p) => sum + p.price, 0);
   const budgetLeft  = BUDGET - totalCost;
   const totalPoints = selectedPlayers.reduce((sum, p) => sum + p.total_points, 0);
 
@@ -117,13 +124,21 @@ export default function MyTeamPage() {
     FWD: selectedPlayers.filter((p) => p.position === "FWD").slice(0, FORMATIONS[formation].FWD),
   }), [selectedPlayers, formation]);
 
+  // The ACTUAL starting XI — byPosition caps each position to the current
+  // formation's slot count, so this can be shorter than selectedIds (e.g.
+  // 2 GKs selected but the formation only starts 1 — the second silently
+  // becomes bench). Save-eligibility must check THIS length, not
+  // selectedIds.length, or the Save button can read "11/11" while the XI
+  // actually sent to the server has fewer than 11 players in it.
+  const startingXI = useMemo(() => [
+    ...byPosition.GK, ...byPosition.DEF, ...byPosition.MID, ...byPosition.FWD,
+  ], [byPosition]);
+
   const benchPlayers = useMemo(() => {
-    const startingIds = [
-      ...byPosition.GK, ...byPosition.DEF, ...byPosition.MID, ...byPosition.FWD,
-    ].map((p) => p.id);
+    const startingIds = startingXI.map((p) => p.id);
     // Bench = squad players not in the starting XI (not unowned players)
     return squadPlayers.filter((p) => !startingIds.includes(p.id)).slice(0, 4);
-  }, [squadPlayers, byPosition]);
+  }, [squadPlayers, startingXI]);
 
   // ── Drag and drop ──────────────────────────────────────────
   const onDragStart = useCallback((e: React.DragEvent, playerId: string) => {
@@ -182,81 +197,66 @@ export default function MyTeamPage() {
   }
 
   // ── Save ──────────────────────────────────────────────────
+  // Delegates to saveTeam() (lib/actions/team.ts), which calls the
+  // save_fantasy_team RPC — the RPC re-validates squad size (15), starting
+  // XI size (11), distinct captain/vice-captain both inside the squad, and
+  // total price against the $100M budget server-side, and writes everything
+  // in one transaction. Never write fantasy_teams/fantasy_team_players
+  // directly from the client — budget_remaining in particular must only
+  // ever be recomputed server-side from the full 15-player squad, not from
+  // whichever 11 happen to be selected as starters client-side.
+  const canSave = squadPlayers.length === 15 && startingXI.length === 11
+    && !!captainId && !!viceCaptainId && captainId !== viceCaptainId;
+
   async function handleSave() {
+    if (!canSave) return;
     setSaving(true);
     setSaveStatus("idle");
+    setSaveError("");
 
-    const startingIds = [
-      ...byPosition.GK, ...byPosition.DEF, ...byPosition.MID, ...byPosition.FWD,
-    ].map((p) => p.id);
+    const startingIds = startingXI.map((p) => p.id);
 
     try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const result = await saveTeam(
+        "My Dream XI",
+        formation,
+        squadPlayers.map((p) => p.id),
+        captainId,
+        viceCaptainId,
+        startingIds
+      );
 
-      if (user) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const sb = supabase as any;
-
-        // 1. Upsert the team record (formation, budget)
-        const { data: team, error: teamErr } = await sb
-          .from("fantasy_teams")
-          .upsert({
-            user_id: user.id,
-            team_name: "My Dream XI",
-            formation: formation,
-            budget_remaining: budgetLeft,
-          }, { onConflict: "user_id" })
-          .select("id")
-          .single();
-
-        if (teamErr || !team) {
-          setSaveStatus("error");
-          return;
-        }
-
-        // 2. Reset ALL squad rows — clear starting/captain flags without deleting them.
-        //    Deleting rows would wipe market purchases, so we UPDATE instead.
-        await sb.from("fantasy_team_players")
-          .update({ is_starting: false, is_captain: false, is_vice_captain: false })
-          .eq("fantasy_team_id", team.id);
-
-        // 3. Mark the chosen starters — verify at least one row was updated
-        if (startingIds.length > 0) {
-          const { data: updated } = await sb.from("fantasy_team_players")
-            .update({ is_starting: true })
-            .eq("fantasy_team_id", team.id)
-            .in("player_id", startingIds)
-            .select("player_id");
-          if (!updated || updated.length === 0) {
-            setSaveStatus("error");
-            return;
-          }
-        }
-
-        // 4. Mark captain and vice-captain
-        if (captainId) {
-          await sb.from("fantasy_team_players")
-            .update({ is_captain: true })
-            .eq("fantasy_team_id", team.id)
-            .eq("player_id", captainId);
-        }
-        if (viceCaptainId) {
-          await sb.from("fantasy_team_players")
-            .update({ is_vice_captain: true })
-            .eq("fantasy_team_id", team.id)
-            .eq("player_id", viceCaptainId);
-        }
+      if (result.error) {
+        setSaveError(result.error);
+        setSaveStatus("error");
+        return;
       }
 
       setSaveStatus("success");
     } catch {
+      setSaveError("Something went wrong. Please try again.");
       setSaveStatus("error");
     } finally {
       setSaving(false);
-      setTimeout(() => setSaveStatus("idle"), 3000);
+      setTimeout(() => setSaveStatus("idle"), 4000);
     }
   }
+
+  // What's still missing before Save is allowed — shown inline so the
+  // 15-player-squad / 11-starter / captain+vice-captain requirements aren't
+  // a mystery the user only discovers via a rejected save.
+  const missingForSave: string[] = [];
+  if (squadPlayers.length < 15) missingForSave.push(`Buy ${15 - squadPlayers.length} more player${15 - squadPlayers.length === 1 ? "" : "s"} (need 15 total)`);
+  if (squadPlayers.length > 15) missingForSave.push(`Sell ${squadPlayers.length - 15} player${squadPlayers.length - 15 === 1 ? "" : "s"} (max 15)`);
+  if (startingXI.length !== 11) {
+    missingForSave.push(`Pick exactly 11 starters that fit ${formation} (currently ${startingXI.length})`);
+    if (selectedIds.length > startingXI.length) {
+      missingForSave.push(`${selectedIds.length - startingXI.length} selected player${selectedIds.length - startingXI.length === 1 ? "" : "s"} don't fit ${formation}'s position slots — pick a different formation or swap players`);
+    }
+  }
+  if (!captainId) missingForSave.push("Set a Captain");
+  if (!viceCaptainId) missingForSave.push("Set a Vice-Captain");
+  if (captainId && viceCaptainId && captainId === viceCaptainId) missingForSave.push("Captain and Vice-Captain must be different players");
 
   // ── Pitch slot ────────────────────────────────────────────
   function PitchSlot({ position, count }: { position: string; count: number }) {
@@ -361,8 +361,10 @@ export default function MyTeamPage() {
           <div className="glass-card px-2 sm:px-5 py-3 sm:py-4 flex items-center gap-1.5 sm:gap-3">
             <Users className="w-4 h-4 text-blue-400 shrink-0" />
             <div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">Players</p>
-              <p className="text-xs sm:text-sm font-bold text-zff-black">{selectedIds.length}/11</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">Squad / Starting XI</p>
+              <p className={cn("text-xs sm:text-sm font-bold", squadPlayers.length === 15 ? "text-zff-black" : "text-amber-500")}>
+                {squadPlayers.length}/15 · {startingXI.length}/11
+              </p>
             </div>
           </div>
           <div className="glass-card px-2 sm:px-5 py-3 sm:py-4 flex items-center gap-1.5 sm:gap-3">
@@ -420,10 +422,20 @@ export default function MyTeamPage() {
                 <Crown className="w-3 h-3" /> Captain
               </button>
               <button
-                onClick={handleSave}
-                disabled={saving}
+                onClick={() => setCaptainMode(captainMode === "vice" ? "none" : "vice")}
                 className={cn(
-                  "text-xs py-2 px-4 flex items-center gap-1 rounded-xl border font-medium transition-all",
+                  "btn-outline text-xs py-2 px-3 flex items-center gap-1",
+                  captainMode === "vice" && "border-yellow-500/50 text-yellow-400"
+                )}
+              >
+                <Crown className="w-3 h-3" /> Vice-Captain
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving || !canSave}
+                title={!canSave ? missingForSave.join(" · ") : undefined}
+                className={cn(
+                  "text-xs py-2 px-4 flex items-center gap-1 rounded-xl border font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed",
                   saveStatus === "success"
                     ? "bg-emerald-600/20 border-emerald-600/40 text-emerald-600"
                     : "btn-primary"
@@ -438,6 +450,17 @@ export default function MyTeamPage() {
             </div>
           </div>
         </div>
+
+        {saveStatus === "error" && saveError && (
+          <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" /> {saveError}
+          </div>
+        )}
+        {saveStatus !== "success" && missingForSave.length > 0 && (
+          <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 text-xs">
+            <span className="font-semibold">Before you can save: </span>{missingForSave.join(" · ")}
+          </div>
+        )}
 
         {captainMode !== "none" && (
           <div className="mb-4 p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-sm flex items-center gap-2">

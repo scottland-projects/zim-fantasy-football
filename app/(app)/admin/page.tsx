@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { saveFlagsAction, updateMatchStatusAction, cancelMatchLiveAction, saveFixtureAction, saveMatchStatsAction, savePrizesAction, updateUserRoleAction, broadcastNotificationAction, addPlayerAction, editPlayerAction, deletePlayerAction, adminResetPasswordAction, logMatchEventAction, deleteMatchEventAction, reopenMatchAction } from "@/lib/actions/admin";
+import { saveFlagsAction, updateMatchStatusAction, cancelMatchLiveAction, saveFixtureAction, saveMatchStatsAction, savePrizesAction, updateUserRoleAction, broadcastNotificationAction, addPlayerAction, editPlayerAction, deletePlayerAction, adminResetPasswordAction, logMatchEventAction, deleteMatchEventAction, reopenMatchAction, listUserEmailsAction } from "@/lib/actions/admin";
 import { deleteLeagueAction } from "@/lib/actions/leagues";
 import { motion, AnimatePresence } from "framer-motion";
 import { TopBar } from "@/components/layout/TopBar";
@@ -69,20 +69,22 @@ export default function AdminPage() {
     async function loadData() {
       try {
         const supabase = createClient();
-        const [{ data: playersData }, { data: profilesData }] = await Promise.all([
+        const [{ data: playersData }, { data: profilesData }, emailResult] = await Promise.all([
           supabase.from("players").select("id, name, position, club, price, total_points, goals, is_injured").order("total_points", { ascending: false }),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (supabase as any).from("profiles").select("id, username, role, fantasy_points, created_at").order("fantasy_points", { ascending: false }),
+          listUserEmailsAction(),
         ]);
         if (playersData && playersData.length > 0) setPlayers(playersData as typeof players);
         if (profilesData && profilesData.length > 0) {
           setUserCount(profilesData.length.toLocaleString());
+          const emails = emailResult.emails ?? {};
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           setUsers((profilesData as any[]).map((p: any, i: number) => ({
             id: String(i + 1),
             userId: p.id,
             username: p.username,
-            email: `${p.username.toLowerCase()}@zff.demo`,
+            email: emails[p.id] ?? "—",
             level: p.role === "admin" ? "Admin" : p.role === "manager" ? "Manager" : p.role === "moderator" ? "Mod" : "User",
             points: p.fantasy_points,
             status: "active",

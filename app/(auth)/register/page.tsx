@@ -15,6 +15,7 @@ function syntheticEmail(phone: string): string {
 
 export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
+  const [slowLoading, setSlowLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmEmailSent, setConfirmEmailSent] = useState<string | null>(null);
@@ -22,11 +23,14 @@ export default function RegisterPage() {
   const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault(); setLoading(true); setError(null); setNotice(null);
+    e.preventDefault(); setLoading(true); setSlowLoading(false); setError(null); setNotice(null);
+    // Account creation can genuinely take several seconds (password hashing,
+    // rate-limit checks) — reassure rather than let a static button read as hung.
+    const slowTimer = setTimeout(() => setSlowLoading(true), 3000);
 
     if (!form.email && !form.phone) {
       setError("Please provide an email address or phone number.");
-      setLoading(false);
+      setLoading(false); clearTimeout(slowTimer); setSlowLoading(false);
       return;
     }
 
@@ -40,9 +44,9 @@ export default function RegisterPage() {
     if (!form.email && form.phone) {
       const authEmail = syntheticEmail(form.phone);
       const result = await phoneSignUpAction(authEmail, form.password, userMeta.username, userMeta.full_name, userMeta.phone);
-      if (result.error) { setError(result.error); setLoading(false); return; }
+      if (result.error) { setError(result.error); setLoading(false); clearTimeout(slowTimer); setSlowLoading(false); return; }
       const { error: signInError } = await supabase.auth.signInWithPassword({ email: authEmail, password: form.password });
-      setLoading(false);
+      setLoading(false); clearTimeout(slowTimer); setSlowLoading(false);
       if (signInError) { setError("Account created — please sign in."); router.push("/login"); return; }
       router.push("/privacy?from=onboarding");
       return;
@@ -53,12 +57,14 @@ export default function RegisterPage() {
       password: form.password,
       options: { data: userMeta },
     });
-    setLoading(false);
+    setLoading(false); clearTimeout(slowTimer); setSlowLoading(false);
     if (error) {
       const msg =
-        error.message.toLowerCase().includes("password")
-          ? "Password must be at least 8 characters."
-          : "Unable to create account. Please try again.";
+        error.status === 429
+          ? "Too many sign-ups right now — please wait a few minutes and try again."
+          : error.message.toLowerCase().includes("password")
+            ? "Password must be at least 8 characters."
+            : "Unable to create account. Please try again.";
       setError(msg);
       return;
     }
@@ -134,6 +140,9 @@ export default function RegisterPage() {
           <Link href="/privacy" target="_blank" className="text-zff-green hover:underline font-medium">Privacy Policy</Link>
           {" "}of OMNI Global.
         </p>
+        {slowLoading && (
+          <p className="text-xs text-center text-muted-foreground">Still working — this can take a few seconds…</p>
+        )}
         <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2 py-3">
           {loading ? "Creating account..." : <><span>Create Account</span><ArrowRight className="w-4 h-4" /></>}
         </button>

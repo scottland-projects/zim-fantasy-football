@@ -1,6 +1,6 @@
 "use client";
 export const dynamic = "force-dynamic";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, User, MapPin, Heart, FileText } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
@@ -8,30 +8,53 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
 const supporters = ["Harare Central Branch","Bulawayo Branch","Mutare Branch","Gweru Branch","Masvingo Branch","Diaspora Branch","Online Supporter"];
-const players = ["Khama Billiat","Leonard Sengwe","Tino Kadewere","Prince Dube","Ovidy Karuru","Knowledge Musona","Denver Mukamba","Shingirai Musendo"];
 const steps = [{ id:1,title:"Tell us about yourself",icon:User},{id:2,title:"Your supporter branch",icon:MapPin},{id:3,title:"Favourite player",icon:Heart},{id:4,title:"Your bio",icon:FileText}];
 
 export default function OnboardingPage() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ full_name:"",supporter_branch:"",favorite_player:"",bio:"" });
+  // No real player names anywhere in this app — every player is a jersey
+  // number under a club. Pull a handful of real top scorers for this step
+  // instead of a hardcoded name list (which previously listed real,
+  // identifiable footballers by name).
+  const [players, setPlayers] = useState<string[]>([]);
   const router = useRouter();
+
+  useEffect(() => {
+    async function loadTopPlayers() {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("players")
+        .select("name, club")
+        .order("total_points", { ascending: false })
+        .limit(8);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (data) setPlayers((data as any[]).map((p) => `${p.club} ${p.name}`));
+    }
+    loadTopPlayers();
+  }, []);
 
   async function handleFinish() {
     setLoading(true);
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      // Enumerate allowed fields explicitly — never spread user-controlled form data
+      // Enumerate allowed fields explicitly — never spread user-controlled form data.
+      // Never touch `username` here: the handle_new_user() trigger already
+      // created the profile row with the username chosen at registration.
+      // This previously upserted a fabricated username derived from the
+      // account's auth email — for phone signups that's the internal
+      // synthetic address (e.g. "263782809284@zff.internal"), so finishing
+      // onboarding silently replaced a real user's chosen username with a
+      // meaningless digit string.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any).from("profiles").upsert({
-        id:               user.id,
-        username:         (user.email?.split("@")[0] ?? "fan").slice(0, 30).replace(/[^a-z0-9_]/gi, "_"),
+      await (supabase as any).from("profiles").update({
         full_name:        form.full_name.slice(0, 100),
         supporter_branch: form.supporter_branch.slice(0, 60),
         favorite_player:  form.favorite_player.slice(0, 60),
         bio:              form.bio.slice(0, 300),
-      }, { onConflict: "id" });
+      }).eq("id", user.id);
     }
     router.push("/dashboard");
   }

@@ -579,24 +579,26 @@ SECURITY DEFINER
 SET search_path = public, auth
 AS $$
 BEGIN
-  INSERT INTO profiles (id, username, full_name, avatar_url)
+  INSERT INTO profiles (id, username, full_name, avatar_url, phone)
   VALUES (
     NEW.id,
     COALESCE(NULLIF(TRIM(NEW.raw_user_meta_data->>'username'), ''), split_part(NEW.email, '@', 1)),
     NEW.raw_user_meta_data->>'full_name',
-    NEW.raw_user_meta_data->>'avatar_url'
+    NEW.raw_user_meta_data->>'avatar_url',
+    NEW.raw_user_meta_data->>'phone'
   )
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 EXCEPTION WHEN unique_violation THEN
   -- Requested username already taken: fall back to email prefix + random suffix
   -- rather than failing the signup outright.
-  INSERT INTO profiles (id, username, full_name, avatar_url)
+  INSERT INTO profiles (id, username, full_name, avatar_url, phone)
   VALUES (
     NEW.id,
     split_part(NEW.email, '@', 1) || '_' || floor(random() * 9000 + 1000)::text,
     NEW.raw_user_meta_data->>'full_name',
-    NEW.raw_user_meta_data->>'avatar_url'
+    NEW.raw_user_meta_data->>'avatar_url',
+    NEW.raw_user_meta_data->>'phone'
   )
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
@@ -630,15 +632,36 @@ CREATE OR REPLACE TRIGGER fantasy_teams_updated_at
 -- service_role only below — never callable directly by anon/authenticated,
 -- to avoid turning this into a username/phone -> email enumeration oracle.
 -- The server-side login action (lib/actions/auth.ts) is the only caller.
-CREATE OR REPLACE FUNCTION resolve_login_identifier(p_identifier TEXT)
-RETURNS TEXT LANGUAGE plpgsql SECURITY DEFINER AS $$
+-- Parameter MUST be named "identifier" — lib/actions/auth.ts calls this via
+-- admin.rpc("resolve_login_identifier", { identifier: trimmed }), and
+-- PostgREST resolves named-JSON RPC args by matching parameter names
+-- exactly. A mismatched name (e.g. p_identifier) makes PostgREST return
+-- "function not found" for every call, which the caller silently treats as
+-- "no such identifier" — breaking username/phone login entirely while
+-- leaving email login (which skips this RPC) looking fine.
+CREATE OR REPLACE FUNCTION resolve_login_identifier(identifier TEXT)
+RETURNS TEXT LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, auth AS $$
 DECLARE
   v_email TEXT;
+  v_clean TEXT;
 BEGIN
+  IF identifier LIKE '%@%' THEN
+    RETURN identifier;
+  END IF;
+
+  v_clean := REGEXP_REPLACE(identifier, '[\s\-()]', '', 'g');
+
   SELECT au.email INTO v_email
   FROM profiles p
   JOIN auth.users au ON au.id = p.id
-  WHERE p.username = p_identifier OR p.phone = p_identifier
+  WHERE p.username = identifier
+  LIMIT 1;
+  IF v_email IS NOT NULL THEN RETURN v_email; END IF;
+
+  SELECT au.email INTO v_email
+  FROM profiles p
+  JOIN auth.users au ON au.id = p.id
+  WHERE REGEXP_REPLACE(COALESCE(p.phone, ''), '[\s\-()]', '', 'g') = v_clean
   LIMIT 1;
   RETURN v_email;
 END;

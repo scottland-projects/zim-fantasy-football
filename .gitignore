@@ -41,3 +41,6 @@ next-env.d.ts
 
 # Internal docs — contain sensitive ops info, keys, legal drafts
 docs/
+
+# Scratch E2E test scripts/screenshots/output — not part of the app
+.e2e-tmp/

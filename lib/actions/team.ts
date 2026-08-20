@@ -22,7 +22,7 @@ export async function saveTeam(
   // save_fantasy_team validates squad size (15), starting XI (11), distinct
   // captain/vice-captain, and total price against the budget server-side,
   // and writes the team + squad in a single transaction — see
-  // supabase/migrations/20260818120000_fix_authorization_and_notifications.sql
+  // lib/supabase/schema.sql
   const { data, error } = await supabase.rpc("save_fantasy_team", {
     p_team_name: teamName.trim().slice(0, 60),
     p_formation: formation,

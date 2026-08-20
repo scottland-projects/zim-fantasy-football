@@ -23,7 +23,7 @@ interface ChatMsg {
 const emojis = ["🔥", "⚽", "💚", "💪", "👑", "🎯", "😂", "❤️", "✅", "🏆"];
 
 export default function CommunityPage() {
-  const [activeTab, setActiveTab] = useState<"chat" | "polls" | "discussions">("polls");
+  const [activeTab, setActiveTab] = useState<"chat" | "polls" | "discussions">("chat");
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [pollData, setPollData] = useState<{ id: string; question: string; options: { label: string; votes: number }[]; totalVotes: number; voted: string | null }[]>([]);
@@ -433,7 +433,7 @@ export default function CommunityPage() {
 
                   <div className="glass-card p-4">
                     <h3 className="font-bold text-zff-black text-sm mb-3">Trending Topics</h3>
-                    {["#BilliatGoal", "#GreenArmy", "#SFCvsFC", "#KhamaKing", "#MD11"].map((tag) => (
+                    {["#MatchdayMagic", "#DreamXI", "#GoldenBoot", "#DerbyDay", "#CleanSheet"].map((tag) => (
                       <div key={tag} className="py-1.5">
                         <span className="text-sm text-zff-green font-medium hover:text-zff-green-light cursor-pointer">
                           {tag}
@@ -448,6 +448,13 @@ export default function CommunityPage() {
 
           {activeTab === "polls" && (
             <motion.div key="polls" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              {pollData.length === 0 ? (
+                <div className="glass-card flex flex-col items-center justify-center py-16 px-6 text-center">
+                  <BarChart2 className="w-10 h-10 text-slate-300 mb-3" />
+                  <p className="text-sm font-semibold text-zff-black mb-1">No active polls right now</p>
+                  <p className="text-xs text-muted-foreground">Check back after the next matchday — admins post fan polls here.</p>
+                </div>
+              ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {pollData.map((poll) => (
                   <div key={poll.id} className="glass-card p-6">
@@ -494,6 +501,7 @@ export default function CommunityPage() {
                   </div>
                 ))}
               </div>
+              )}
             </motion.div>
           )}
 
