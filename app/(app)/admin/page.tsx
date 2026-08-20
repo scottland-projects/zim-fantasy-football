@@ -636,7 +636,7 @@ export default function AdminPage() {
                       <div className="p-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div className="col-span-2 sm:col-span-1">
                           <label className="text-xs font-medium text-muted-foreground mb-1 block">Name *</label>
-                          <input value={playerForm.name} onChange={e => setPlayerForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Tapiwa Chirwa" className="input text-sm py-2" />
+                          <input value={playerForm.name} onChange={e => setPlayerForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. #9 (jersey number only, no real names)" className="input text-sm py-2" />
                         </div>
                         <div>
                           <label className="text-xs font-medium text-muted-foreground mb-1 block">Position *</label>
@@ -980,11 +980,11 @@ export default function AdminPage() {
                       <div className="p-5 grid grid-cols-2 sm:grid-cols-3 gap-3">
                         <div>
                           <label className="text-xs font-medium text-muted-foreground mb-1 block">Home Team *</label>
-                          <input value={fixtureForm.home} onChange={e => setFixtureForm(p => ({ ...p, home: e.target.value }))} placeholder="e.g. Harare Rangers" className="input text-sm py-2" />
+                          <input value={fixtureForm.home} onChange={e => setFixtureForm(p => ({ ...p, home: e.target.value }))} placeholder="e.g. Bosso" className="input text-sm py-2" />
                         </div>
                         <div>
                           <label className="text-xs font-medium text-muted-foreground mb-1 block">Away Team *</label>
-                          <input value={fixtureForm.away} onChange={e => setFixtureForm(p => ({ ...p, away: e.target.value }))} placeholder="e.g. Bulawayo Barons" className="input text-sm py-2" />
+                          <input value={fixtureForm.away} onChange={e => setFixtureForm(p => ({ ...p, away: e.target.value }))} placeholder="e.g. DeMbare" className="input text-sm py-2" />
                         </div>
                         <div>
                           <label className="text-xs font-medium text-muted-foreground mb-1 block">Matchday *</label>

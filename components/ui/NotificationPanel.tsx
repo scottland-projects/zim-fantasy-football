@@ -9,7 +9,7 @@ const mockNotifications = [
   { id: "1", type: "goal", title: "Khama Billiat scored! ⚽", body: "Your captain just bagged a brace. +12 pts!", read: false, created_at: new Date(Date.now() - 120000).toISOString() },
   { id: "2", type: "league", title: "You climbed to #247!", body: "Great performance this matchday.", read: false, created_at: new Date(Date.now() - 3600000).toISOString() },
   { id: "3", type: "reward", title: "Achievement Unlocked! 🏆", body: "You earned 'Transfer Master' badge!", read: false, created_at: new Date(Date.now() - 86400000).toISOString() },
-  { id: "4", type: "match", title: "MD12 starts in 2 hours", body: "Harare Rangers vs Bulawayo Barons. Check your team!", read: true, created_at: new Date(Date.now() - 172800000).toISOString() },
+  { id: "4", type: "match", title: "MD12 starts in 2 hours", body: "Bosso vs DeMbare. Check your team!", read: true, created_at: new Date(Date.now() - 172800000).toISOString() },
   { id: "5", type: "transfer", title: "Transfer deadline soon", body: "Transfer window closes in 24 hours!", read: true, created_at: new Date(Date.now() - 259200000).toISOString() },
 ];
 

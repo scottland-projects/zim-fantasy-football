@@ -446,130 +446,126 @@ ALTER PUBLICATION supabase_realtime ADD TABLE match_events;
 ALTER PUBLICATION supabase_realtime ADD TABLE fantasy_teams;
 
 -- =============================================
--- SEED DATA — six original, fictional Zimbabwean clubs
+-- SEED DATA — the 18 real 2026 Castle Lager PSL clubs, identified by their
+-- common fan nicknames (or short name where no widely-used nickname exists)
+-- rather than full registered club names. Players carry NO real names —
+-- every player is seeded as "{club code} #{squad number}" only. Squad
+-- numbers below follow ordinary football numbering conventions (1 = GK,
+-- etc.) but are illustrative, not scraped from any official/verified squad
+-- list — no claim is made that a given number belongs to a specific real
+-- individual. See LEGAL.md before broadening this to real player names.
 -- =============================================
--- None of these names, crests, or players correspond to any real club,
--- league, or footballer. Purely original placeholder content for launch.
 
 INSERT INTO teams (name, short_name, city, primary_color) VALUES
-  ('Harare Rangers',     'HRR', 'Harare',     '#15803D'),
-  ('Bulawayo Barons',    'BUL', 'Bulawayo',   '#CA8A04'),
-  ('Mutare Miners',      'MUT', 'Mutare',     '#B91C1C'),
-  ('Gweru Warriors',     'GWE', 'Gweru',      '#1D4ED8'),
-  ('Masvingo Eagles',    'MAS', 'Masvingo',   '#0F766E'),
-  ('Kwekwe City',        'KWK', 'Kwekwe',     '#7E22CE')
+  ('Scottland',         'SCO', 'Harare',        '#15803D'),
+  ('Golden Boys',        'HRK', 'Kwekwe',        '#CA8A04'),
+  ('DeMbare',            'DYN', 'Harare',        '#1D4ED8'),
+  ('Vabvamburi',         'HER', 'Harare',        '#0F766E'),
+  ('Ngezi Platinum',     'NPS', 'Ngezi',         '#7E22CE'),
+  ('Makepekepe',         'CAP', 'Harare',        '#15803D'),
+  ('Bosso',              'HIG', 'Bulawayo',      '#0F172A'),
+  ('The Punters',        'MWO', 'Norton',        '#B91C1C'),
+  ('Simba Bhora',        'SIM', 'Shamva',        '#CA8A04'),
+  ('Gamecocks',          'CHI', 'Bulawayo',      '#DC2626'),
+  ('FC Platinum',        'FCP', 'Zvishavane',    '#1D4ED8'),
+  ('Amakhosi',           'BCH', 'Bulawayo',      '#000000'),
+  ('ZPC Kariba',         'ZPC', 'Kariba',        '#0369A1'),
+  ('Hunters',            'HUN', 'Marondera',     '#166534'),
+  ('Agama',              'AGA', 'Mount Darwin',  '#B45309'),
+  ('WiFi Boys',          'TEL', 'Harare',        '#2563EB'),
+  ('Gem Boys',           'MAN', 'Mutare',        '#059669'),
+  ('Sugar Sugar Boyz',   'TRI', 'Triangle',      '#EA580C')
 ON CONFLICT DO NOTHING;
 
-INSERT INTO players (name, position, club, price, total_points, goals, assists, clean_sheets, form) VALUES
-  -- Harare Rangers
-  ('Tapiwa Chirwa',      'GK',  'Harare Rangers',   5200000, 84, 0, 0, 7, 7.0),
-  ('Munashe Gutu',       'GK',  'Harare Rangers',   4200000, 58, 0, 0, 4, 6.0),
-  ('Blessing Chikwira',  'DEF', 'Harare Rangers',   5800000, 88, 2, 3, 6, 7.5),
-  ('Tanaka Muredzi',     'DEF', 'Harare Rangers',   5200000, 76, 1, 2, 5, 6.9),
-  ('Simbarashe Gwenzi',  'DEF', 'Harare Rangers',   4800000, 69, 0, 2, 4, 6.4),
-  ('Farai Nyoni',        'DEF', 'Harare Rangers',   4600000, 64, 1, 1, 4, 6.1),
-  ('Kudakwashe Marufu',  'MID', 'Harare Rangers',   8200000, 124, 6, 10, 1, 8.8),
-  ('Tendai Muchineripi', 'MID', 'Harare Rangers',   7200000, 109, 4, 8, 1, 8.3),
-  ('Anesu Chidyausiku',  'MID', 'Harare Rangers',   6400000, 91, 3, 5, 0, 7.6),
-  ('Rutendo Mapfumo',    'FWD', 'Harare Rangers',   11200000, 168, 17, 8, 0, 9.5),
-  ('Takudzwa Mhofu',     'FWD', 'Harare Rangers',   9500000, 138, 12, 6, 0, 8.8),
-  ('Believe Chuma',      'FWD', 'Harare Rangers',   7800000, 112, 9, 5, 0, 8.1),
-  ('Panashe Zishiri',    'FWD', 'Harare Rangers',   6800000, 94, 7, 4, 0, 7.5),
-  ('Wisdom Chademana',   'MID', 'Harare Rangers',   6000000, 82, 2, 6, 0, 7.2),
+DO $$
+DECLARE
+  v_clubs TEXT[] := ARRAY['Scottland','Golden Boys','DeMbare','Vabvamburi','Ngezi Platinum','Makepekepe','Bosso','The Punters','Simba Bhora','Gamecocks','FC Platinum','Amakhosi','ZPC Kariba','Hunters','Agama','WiFi Boys','Gem Boys','Sugar Sugar Boyz'];
+  -- position + squad number per slot, 14 players per club (2 GK, 4 DEF, 4 MID, 4 FWD)
+  v_slots TEXT[] := ARRAY['GK:1','GK:22','DEF:2','DEF:3','DEF:4','DEF:5','MID:6','MID:7','MID:8','MID:10','FWD:9','FWD:11','FWD:14','FWD:17'];
+  v_club TEXT;
+  v_slot TEXT;
+  v_pos TEXT;
+  v_num INT;
+  v_price INT;
+  v_points INT;
+  v_goals INT;
+  v_assists INT;
+  v_cs INT;
+  v_form NUMERIC;
+BEGIN
+  PERFORM setseed(0.73);
+  FOREACH v_club IN ARRAY v_clubs LOOP
+    FOREACH v_slot IN ARRAY v_slots LOOP
+      v_pos := split_part(v_slot, ':', 1);
+      v_num := split_part(v_slot, ':', 2)::INT;
 
-  -- Bulawayo Barons
-  ('Nkosana Ndlovu',     'GK',  'Bulawayo Barons',  5000000, 81, 0, 0, 7, 6.9),
-  ('Mthokozisi Sibanda', 'GK',  'Bulawayo Barons',  4000000, 52, 0, 0, 3, 5.8),
-  ('Thabani Moyo',       'DEF', 'Bulawayo Barons',  5600000, 85, 2, 2, 6, 7.3),
-  ('Sanele Dube',        'DEF', 'Bulawayo Barons',  5000000, 71, 1, 1, 5, 6.6),
-  ('Nkululeko Khumalo',  'DEF', 'Bulawayo Barons',  4700000, 66, 0, 2, 4, 6.2),
-  ('Mandla Nyathi',      'DEF', 'Bulawayo Barons',  4500000, 61, 1, 1, 3, 6.0),
-  ('Sipho Mahlangu',     'MID', 'Bulawayo Barons',  7900000, 117, 5, 9, 1, 8.4),
-  ('Bongani Ncube',      'MID', 'Bulawayo Barons',  6900000, 99, 3, 7, 0, 7.8),
-  ('Zenzo Mabhena',      'MID', 'Bulawayo Barons',  6100000, 87, 3, 5, 0, 7.4),
-  ('Sikhumbuzo Mpofu',   'FWD', 'Bulawayo Barons',  10500000, 152, 15, 7, 0, 9.1),
-  ('Prosper Zulu',       'FWD', 'Bulawayo Barons',  8800000, 126, 10, 6, 0, 8.5),
-  ('Nqobizitha Sithole', 'FWD', 'Bulawayo Barons',  7200000, 103, 8, 4, 0, 7.9),
-  ('Lindani Gumbo',      'FWD', 'Bulawayo Barons',  6300000, 85, 6, 3, 0, 7.2),
-  ('Ayanda Phiri',       'MID', 'Bulawayo Barons',  5700000, 76, 2, 5, 0, 6.9),
+      CASE v_pos
+        WHEN 'GK' THEN
+          v_price   := 4200000 + floor(random() * 1600000)::INT;
+          v_points  := 55 + floor(random() * 40)::INT;
+          v_goals   := 0;
+          v_assists := floor(random() * 2)::INT;
+          v_cs      := 3 + floor(random() * 6)::INT;
+        WHEN 'DEF' THEN
+          v_price   := 4400000 + floor(random() * 1800000)::INT;
+          v_points  := 55 + floor(random() * 35)::INT;
+          v_goals   := floor(random() * 3)::INT;
+          v_assists := floor(random() * 4)::INT;
+          v_cs      := 2 + floor(random() * 6)::INT;
+        WHEN 'MID' THEN
+          v_price   := 5500000 + floor(random() * 3000000)::INT;
+          v_points  := 70 + floor(random() * 55)::INT;
+          v_goals   := 1 + floor(random() * 6)::INT;
+          v_assists := 2 + floor(random() * 9)::INT;
+          v_cs      := floor(random() * 2)::INT;
+        ELSE -- FWD
+          v_price   := 6000000 + floor(random() * 5500000)::INT;
+          v_points  := 75 + floor(random() * 95)::INT;
+          v_goals   := 3 + floor(random() * 16)::INT;
+          v_assists := 2 + floor(random() * 7)::INT;
+          v_cs      := 0;
+      END CASE;
 
-  -- Mutare Miners
-  ('Godfrey Mutasa',     'GK',  'Mutare Miners',    4900000, 77, 0, 0, 6, 6.7),
-  ('Trust Zvidzai',      'GK',  'Mutare Miners',    3900000, 49, 0, 0, 3, 5.6),
-  ('Charles Musanhu',    'DEF', 'Mutare Miners',    5400000, 79, 1, 2, 5, 7.0),
-  ('Lameck Chiwara',     'DEF', 'Mutare Miners',    4900000, 67, 1, 1, 4, 6.3),
-  ('Pardon Mativenga',   'DEF', 'Mutare Miners',    4600000, 62, 0, 1, 4, 6.0),
-  ('Netsai Marange',     'DEF', 'Mutare Miners',    4400000, 58, 0, 1, 3, 5.8),
-  ('Talent Chigumba',    'MID', 'Mutare Miners',    7500000, 108, 4, 8, 0, 8.0),
-  ('Praise Mudhindo',    'MID', 'Mutare Miners',    6600000, 92, 3, 6, 0, 7.5),
-  ('Ishmael Bere',       'MID', 'Mutare Miners',    5900000, 80, 2, 4, 0, 7.0),
-  ('Delight Chisango',   'FWD', 'Mutare Miners',    9900000, 141, 13, 6, 0, 8.9),
-  ('Method Manyeza',     'FWD', 'Mutare Miners',    8300000, 118, 9, 5, 0, 8.2),
-  ('Providence Katsande','FWD', 'Mutare Miners',    6900000, 96, 7, 4, 0, 7.6),
-  ('Blessing Mangoma',   'FWD', 'Mutare Miners',    6000000, 79, 5, 3, 0, 7.0),
-  ('Custom Nemasango',   'MID', 'Mutare Miners',    5500000, 72, 2, 4, 0, 6.7),
+      v_form := round((5.5 + random() * 4.3)::NUMERIC, 1);
 
-  -- Gweru Warriors
-  ('Innocent Nyathi',    'GK',  'Gweru Warriors',   5100000, 83, 0, 0, 7, 7.0),
-  ('Perfect Chinamasa',  'GK',  'Gweru Warriors',   4100000, 55, 0, 0, 4, 5.9),
-  ('Vengai Muzenda',     'DEF', 'Gweru Warriors',   5700000, 87, 2, 3, 6, 7.4),
-  ('Tafara Mudimu',      'DEF', 'Gweru Warriors',   5100000, 73, 1, 2, 5, 6.7),
-  ('Gift Muchena',       'DEF', 'Gweru Warriors',   4800000, 68, 1, 1, 4, 6.3),
-  ('Everson Chivende',   'DEF', 'Gweru Warriors',   4500000, 60, 0, 1, 3, 5.9),
-  ('Nyasha Mataruse',    'MID', 'Gweru Warriors',   8000000, 120, 5, 9, 1, 8.5),
-  ('Milton Chidavaenzi', 'MID', 'Gweru Warriors',   7000000, 104, 4, 7, 0, 8.0),
-  ('Denford Bwanya',     'MID', 'Gweru Warriors',   6200000, 89, 3, 5, 0, 7.4),
-  ('Marvellous Chirinda','FWD', 'Gweru Warriors',   10800000, 158, 16, 7, 0, 9.3),
-  ('Hardlife Zvirekwi',  'FWD', 'Gweru Warriors',   9000000, 129, 11, 6, 0, 8.6),
-  ('Godknows Murwira',   'FWD', 'Gweru Warriors',   7400000, 106, 8, 5, 0, 8.0),
-  ('Fortune Chikandiwa', 'FWD', 'Gweru Warriors',   6500000, 89, 6, 3, 0, 7.3),
-  ('Progress Muteswa',   'MID', 'Gweru Warriors',   5800000, 78, 2, 5, 0, 7.0),
+      INSERT INTO players (name, position, club, price, total_points, goals, assists, clean_sheets, form)
+      VALUES ('#' || v_num, v_pos, v_club, v_price, v_points, v_goals, v_assists, v_cs, v_form);
+    END LOOP;
+  END LOOP;
+END $$;
 
-  -- Masvingo Eagles
-  ('Loveness Mutero',    'GK',  'Masvingo Eagles',  4800000, 75, 0, 0, 6, 6.6),
-  ('Shepherd Chivasa',   'GK',  'Masvingo Eagles',  3800000, 47, 0, 0, 3, 5.5),
-  ('Clemence Nherera',   'DEF', 'Masvingo Eagles',  5300000, 78, 1, 2, 5, 6.9),
-  ('Norest Chapfika',    'DEF', 'Masvingo Eagles',  4800000, 65, 1, 1, 4, 6.2),
-  ('Passmore Chiweshe',  'DEF', 'Masvingo Eagles',  4500000, 60, 0, 1, 3, 5.9),
-  ('Regis Mavhima',      'DEF', 'Masvingo Eagles',  4300000, 55, 0, 1, 3, 5.7),
-  ('Silence Musaigwa',   'MID', 'Masvingo Eagles',  7300000, 105, 4, 7, 0, 7.9),
-  ('Lovemore Chinyerere','MID', 'Masvingo Eagles',  6400000, 89, 3, 6, 0, 7.4),
-  ('Munyaradzi Gapare',  'MID', 'Masvingo Eagles',  5700000, 76, 2, 4, 0, 6.9),
-  ('Freedom Sithole',    'FWD', 'Masvingo Eagles',  9600000, 136, 12, 6, 0, 8.7),
-  ('Justice Machaya',    'FWD', 'Masvingo Eagles',  8000000, 114, 9, 5, 0, 8.0),
-  ('Learnmore Bepe',     'FWD', 'Masvingo Eagles',  6700000, 92, 7, 4, 0, 7.4),
-  ('Comfort Rusike',     'FWD', 'Masvingo Eagles',  5900000, 76, 5, 3, 0, 6.8),
-  ('Terrence Dziruni',   'MID', 'Masvingo Eagles',  5300000, 68, 2, 3, 0, 6.5),
-
-  -- Kwekwe City
-  ('Ngonidzashe Mari',   'GK',  'Kwekwe City',      4700000, 73, 0, 0, 6, 6.5),
-  ('Believe Sango',      'GK',  'Kwekwe City',      3700000, 45, 0, 0, 3, 5.4),
-  ('Kelvin Chirinda',    'DEF', 'Kwekwe City',      5100000, 76, 1, 2, 5, 6.8),
-  ('Elton Musarurwa',    'DEF', 'Kwekwe City',      4600000, 63, 1, 1, 4, 6.1),
-  ('Obert Muzenda',      'DEF', 'Kwekwe City',      4400000, 58, 0, 1, 3, 5.8),
-  ('Ronald Chinembiri',  'DEF', 'Kwekwe City',      4200000, 53, 0, 1, 3, 5.6),
-  ('Ashley Manyowa',     'MID', 'Kwekwe City',      7100000, 102, 4, 7, 0, 7.8),
-  ('Collen Warinda',     'MID', 'Kwekwe City',      6200000, 86, 3, 5, 0, 7.3),
-  ('Kelvin Madzongwe',   'MID', 'Kwekwe City',      5500000, 73, 2, 4, 0, 6.8),
-  ('Devine Chidzambwa',  'FWD', 'Kwekwe City',      9200000, 131, 11, 5, 0, 8.5),
-  ('Blessed Gono',       'FWD', 'Kwekwe City',      7700000, 110, 8, 5, 0, 7.9),
-  ('Anymore Chikafu',    'FWD', 'Kwekwe City',      6400000, 88, 6, 4, 0, 7.3),
-  ('Ontibile Ndoro',     'FWD', 'Kwekwe City',      5700000, 72, 5, 3, 0, 6.7),
-  ('Farirai Bhasera',    'MID', 'Kwekwe City',      5100000, 64, 2, 3, 0, 6.4)
-ON CONFLICT DO NOTHING;
-
--- Seed fixtures — no club is favoured; matchdays rotate every club through
--- home and away fixtures against different opponents.
+-- Seed fixtures — every club plays exactly once per matchday, paired using
+-- well-known real rivalries where one exists (e.g. Bosso vs DeMbare).
 INSERT INTO matches (home_team, away_team, kickoff_time, status, matchday, season) VALUES
-  ('Harare Rangers',  'Bulawayo Barons', NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
-  ('Mutare Miners',   'Gweru Warriors',  NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
-  ('Masvingo Eagles', 'Kwekwe City',     NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
-  ('Bulawayo Barons', 'Mutare Miners',   NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
-  ('Gweru Warriors',  'Masvingo Eagles', NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
-  ('Kwekwe City',     'Harare Rangers',  NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
-  ('Harare Rangers',  'Gweru Warriors',  NOW() + INTERVAL '2 days',  'scheduled', 3, '2026'),
-  ('Mutare Miners',   'Kwekwe City',     NOW() + INTERVAL '2 days',  'scheduled', 3, '2026'),
-  ('Bulawayo Barons', 'Masvingo Eagles', NOW() + INTERVAL '3 days',  'scheduled', 3, '2026')
+  ('Bosso',           'DeMbare',          NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
+  ('Makepekepe',      'Amakhosi',         NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
+  ('Gamecocks',       'Vabvamburi',       NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
+  ('FC Platinum',     'Ngezi Platinum',   NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
+  ('Simba Bhora',     'Golden Boys',      NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
+  ('ZPC Kariba',      'Hunters',          NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
+  ('Agama',           'WiFi Boys',        NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
+  ('Gem Boys',        'Sugar Sugar Boyz', NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
+  ('Scottland',       'The Punters',      NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
+
+  ('DeMbare',         'Makepekepe',       NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
+  ('Amakhosi',        'Gamecocks',        NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
+  ('Vabvamburi',      'FC Platinum',      NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
+  ('Ngezi Platinum',  'Simba Bhora',      NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
+  ('Golden Boys',     'ZPC Kariba',       NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
+  ('Hunters',         'Agama',            NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
+  ('WiFi Boys',       'Gem Boys',         NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
+  ('Sugar Sugar Boyz','Scottland',        NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
+  ('The Punters',     'Bosso',            NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
+
+  ('Bosso',           'Amakhosi',         NOW() + INTERVAL '2 days',  'scheduled', 3, '2026'),
+  ('Makepekepe',      'Vabvamburi',       NOW() + INTERVAL '2 days',  'scheduled', 3, '2026'),
+  ('DeMbare',         'Ngezi Platinum',   NOW() + INTERVAL '2 days',  'scheduled', 3, '2026'),
+  ('Gamecocks',       'Golden Boys',      NOW() + INTERVAL '3 days',  'scheduled', 3, '2026'),
+  ('FC Platinum',     'Hunters',          NOW() + INTERVAL '3 days',  'scheduled', 3, '2026'),
+  ('Simba Bhora',     'WiFi Boys',        NOW() + INTERVAL '3 days',  'scheduled', 3, '2026'),
+  ('ZPC Kariba',      'Sugar Sugar Boyz', NOW() + INTERVAL '3 days',  'scheduled', 3, '2026'),
+  ('Agama',           'Scottland',        NOW() + INTERVAL '3 days',  'scheduled', 3, '2026'),
+  ('Gem Boys',        'The Punters',      NOW() + INTERVAL '3 days',  'scheduled', 3, '2026')
 ON CONFLICT DO NOTHING;
 
 -- =============================================
