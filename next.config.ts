@@ -34,10 +34,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        // TODO: replace with this project's own Supabase ref once the
-        // Zim Fantasy Football Supabase project is created — this is a
-        // placeholder, not the SFC project's hostname.
-        hostname: "placeholder.supabase.co",
+        hostname: "eqybrhfisdzurtgemeon.supabase.co",
         pathname: "/storage/v1/object/public/**",
       },
       {
