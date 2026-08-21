@@ -45,10 +45,19 @@ CREATE POLICY "Users can update own profile"
 -- (column grants don't affect a function's SECURITY DEFINER context, and
 -- the owner reads their own row through the app's authenticated client
 -- using an explicit column list that excludes phone from other users).
-REVOKE SELECT (phone) ON profiles FROM anon, authenticated;
+--
+-- A plain "REVOKE SELECT (phone) ... FROM anon, authenticated" does NOT
+-- work on its own and was confirmed live to leak every user's phone number
+-- to a fully anonymous request: Supabase grants table-level
+-- "GRANT SELECT ON ALL TABLES IN SCHEMA public" to anon/authenticated by
+-- default, and a column-level REVOKE cannot narrow a privilege that was
+-- granted at the table level — the broader table grant still wins. The
+-- table-level SELECT has to be revoked first, then re-granted only for the
+-- safe columns.
+REVOKE SELECT ON profiles FROM anon, authenticated;
 GRANT SELECT (id, username, full_name, avatar_url, role, xp, level, fantasy_points,
   favorite_player, supporter_branch, bio, created_at, updated_at) ON profiles TO anon, authenticated;
-GRANT SELECT (phone) ON profiles TO service_role;
+GRANT SELECT ON profiles TO service_role;
 
 -- =============================================
 -- TEAMS TABLE — canonical list of fictional clubs
@@ -186,7 +195,44 @@ CREATE TABLE IF NOT EXISTS league_members (
 
 ALTER TABLE league_members ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "League members viewable by members" ON league_members FOR SELECT USING (true);
+-- "viewable by members" means exactly that, not USING(true). A flat
+-- USING(true) here was confirmed exploitable — a fully anonymous,
+-- unauthenticated request with only the public anon key returned every
+-- league's membership (user_id, points, rank) for every league, private or
+-- public, defeating the private-league privacy model entirely (leagues.
+-- SELECT already correctly hides private league metadata from non-members;
+-- this table was the leak). The app only ever reads this table scoped to
+-- leagues the caller already belongs to, so restricting to fellow-members
+-- breaks no legitimate flow.
+--
+-- The membership check has to go through a SECURITY DEFINER function rather
+-- than an inline EXISTS subquery on league_members itself — a policy that
+-- queries its own table directly re-triggers that same policy for the
+-- subquery, and Postgres refuses with "infinite recursion detected in
+-- policy for relation league_members" rather than resolving it. Running the
+-- check inside a SECURITY DEFINER function sidesteps this: that inner query
+-- executes with the function's own privileges, not subject to the RLS
+-- policy being evaluated, so there's nothing to recurse into.
+-- Known limitation: an INSERT ... RETURNING (PostgREST's Prefer:
+-- return=representation) fails RLS here even for the row's own owner,
+-- because the SELECT-policy re-check inside RETURNING doesn't see the row
+-- this same command just inserted through a SECURITY DEFINER function call.
+-- A plain INSERT (no RETURNING) and any subsequent SELECT both work
+-- correctly — confirmed live. Not a functional issue in practice: every
+-- league_members insert in this app (createLeague, joinLeague,
+-- joinPublicLeague) already omits .select(), so none of them hit this path.
+-- If a future caller needs the inserted row back, re-fetch it in a second
+-- request rather than chaining .select() on the insert.
+CREATE OR REPLACE FUNCTION is_league_member(p_league_id UUID)
+RETURNS BOOLEAN LANGUAGE sql SECURITY DEFINER SET search_path = public, auth AS $$
+  SELECT EXISTS (SELECT 1 FROM league_members WHERE league_id = p_league_id AND user_id = auth.uid());
+$$;
+REVOKE EXECUTE ON FUNCTION is_league_member(UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION is_league_member(UUID) TO authenticated;
+
+CREATE POLICY "League members viewable by members" ON league_members FOR SELECT USING (
+  is_league_member(league_id)
+);
 CREATE POLICY "Users join leagues" ON league_members FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users leave leagues" ON league_members FOR DELETE USING (auth.uid() = user_id);
 
@@ -359,6 +405,13 @@ DECLARE
   v_votes    JSONB;
 BEGIN
   IF v_user IS NULL THEN RETURN jsonb_build_object('ok', false, 'error', 'not authenticated'); END IF;
+
+  -- The admin panel's "Fan Polls" toggle only ever hid the voting UI
+  -- client-side — this RPC never checked it itself.
+  IF (SELECT (value->>'polls')::boolean FROM app_config WHERE key = 'feature_flags') IS FALSE THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'polls are currently disabled');
+  END IF;
+
   IF NOT EXISTS (SELECT 1 FROM polls WHERE id = p_poll_id AND options ? p_option) THEN
     RETURN jsonb_build_object('ok', false, 'error', 'invalid option');
   END IF;
@@ -788,6 +841,14 @@ DECLARE
 BEGIN
   IF v_user IS NULL THEN RETURN jsonb_build_object('error', 'not authenticated'); END IF;
 
+  -- The admin panel's "Transfer Window" toggle only ever hid the Buy/Sell
+  -- buttons client-side — these RPCs never checked it themselves, so anyone
+  -- calling them directly (or with the page already open) could still
+  -- trade with the market supposedly frozen.
+  IF (SELECT (value->>'transferWindow')::boolean FROM app_config WHERE key = 'feature_flags') IS FALSE THEN
+    RETURN jsonb_build_object('error', 'the transfer window is currently closed');
+  END IF;
+
   SELECT id, budget_remaining INTO v_team_id, v_budget
   FROM fantasy_teams WHERE user_id = v_user FOR UPDATE;
   IF v_team_id IS NULL THEN RETURN jsonb_build_object('error', 'no fantasy team yet'); END IF;
@@ -821,6 +882,10 @@ DECLARE
   v_price BIGINT;
 BEGIN
   IF v_user IS NULL THEN RETURN jsonb_build_object('error', 'not authenticated'); END IF;
+
+  IF (SELECT (value->>'transferWindow')::boolean FROM app_config WHERE key = 'feature_flags') IS FALSE THEN
+    RETURN jsonb_build_object('error', 'the transfer window is currently closed');
+  END IF;
 
   SELECT id INTO v_team_id FROM fantasy_teams WHERE user_id = v_user FOR UPDATE;
   IF v_team_id IS NULL THEN RETURN jsonb_build_object('error', 'no fantasy team yet'); END IF;

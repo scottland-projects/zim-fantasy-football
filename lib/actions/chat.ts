@@ -12,6 +12,13 @@ export async function sendChatMessageAction(message: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
 
+  // The admin panel's "Matchday Chat" toggle only ever hid the compose UI
+  // client-side — sendChatMessageAction itself never checked it, so the
+  // moderation kill-switch didn't actually stop anyone who already had the
+  // page open (or called this action directly) from posting.
+  const { data: flagRow } = await supabase.from("app_config").select("value").eq("key", "feature_flags").single();
+  if (flagRow?.value?.chat === false) return { error: "Chat is currently disabled" };
+
   const { error } = await supabase.from("chat_messages").insert({
     user_id: user.id,
     message: trimmed,

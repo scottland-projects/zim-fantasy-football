@@ -229,10 +229,26 @@ export async function updateUserRoleAction(userId: string, role: string) {
   const VALID_ROLES = ["user", "manager", "moderator", "admin"];
   if (!VALID_ROLES.includes(role)) return { error: "Invalid role" };
 
-  const { error, supabase } = await requireAdmin();
-  if (error || !supabase) return { error: error ?? "Unknown error" };
+  const { error } = await requireAdmin();
+  if (error) return { error };
 
-  await supabase.from("profiles").update({ role }).eq("id", userId);
+  // profiles' only UPDATE policy is "auth.uid() = id" (self-service edits to
+  // your own bio etc.) — there is no role-based admin-override policy on
+  // this table, so running this through the user-scoped client would have
+  // RLS silently filter out the target row: 0 rows updated, no error
+  // returned, and the caller sees { success: true } for a role change that
+  // never happened. requireAdmin() has already authorized the caller above,
+  // so the actual write goes through the service role.
+  const { data, error: updateErr } = await serviceRole()
+    .from("profiles")
+    .update({ role })
+    .eq("id", userId)
+    .select("id");
+
+  if (updateErr) return { error: updateErr.message };
+  if (!data || data.length === 0) return { error: "User not found" };
+
+  revalidatePath("/admin");
   return { success: true };
 }
 

@@ -26,6 +26,12 @@ export async function createLeague(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
 
+  // The admin panel's "League Creation" toggle only ever hid the Create
+  // League button client-side — this action never checked it, so it did
+  // nothing to actually stop new leagues from being created.
+  const { data: flagRow } = await supabase.from("app_config").select("value").eq("key", "feature_flags").single();
+  if (flagRow?.value?.leagueCreation === false) return { error: "League creation is currently disabled" };
+
   const inviteCode = generateInviteCode();
 
   const hasPrizes = prizes && (prizes.first || prizes.second || prizes.third);
