@@ -338,12 +338,101 @@ END;
 $$;
 
 
--- ─── 7. Least-privilege grants ────────────────────────────────────────────
+-- ─── 8. Score-prediction points — separate lightweight game mode ────────────
+--
+-- Scoring rules (classic 3-2-1-0 scheme):
+--   Exact scoreline                        : 3 pts
+--   Correct outcome + correct goal margin  : 2 pts
+--   Correct outcome only (W/D/L)           : 1 pt
+--   Wrong outcome                          : 0 pts
+
+CREATE OR REPLACE FUNCTION calculate_prediction_points(
+  p_pred_home   INTEGER,
+  p_pred_away   INTEGER,
+  p_actual_home INTEGER,
+  p_actual_away INTEGER
+)
+RETURNS INTEGER
+LANGUAGE plpgsql
+IMMUTABLE
+AS $$
+DECLARE
+  pred_outcome   TEXT;
+  actual_outcome TEXT;
+BEGIN
+  IF p_pred_home = p_actual_home AND p_pred_away = p_actual_away THEN
+    RETURN 3;
+  END IF;
+
+  pred_outcome   := CASE WHEN p_pred_home   > p_pred_away   THEN 'H' WHEN p_pred_home   < p_pred_away   THEN 'A' ELSE 'D' END;
+  actual_outcome := CASE WHEN p_actual_home > p_actual_away THEN 'H' WHEN p_actual_home < p_actual_away THEN 'A' ELSE 'D' END;
+
+  IF pred_outcome <> actual_outcome THEN
+    RETURN 0;
+  END IF;
+
+  IF (p_pred_home - p_pred_away) = (p_actual_home - p_actual_away) THEN
+    RETURN 2;
+  END IF;
+
+  RETURN 1;
+END;
+$$;
+
+-- Call after a match's home_score/away_score are finalised (the admin panel
+-- does this from saveMatchStatsAction right after marking the match
+-- 'finished'). Scores every prediction on that match in one pass.
+CREATE OR REPLACE FUNCTION score_predictions_for_match(p_match_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_home INTEGER;
+  v_away INTEGER;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'manager')) THEN
+    RAISE EXCEPTION 'not authorized';
+  END IF;
+
+  SELECT home_score, away_score INTO v_home, v_away FROM matches WHERE id = p_match_id;
+  IF v_home IS NULL OR v_away IS NULL THEN
+    RAISE EXCEPTION 'match has no final score yet';
+  END IF;
+
+  UPDATE score_predictions
+  SET points_earned = calculate_prediction_points(predicted_home_score, predicted_away_score, v_home, v_away),
+      updated_at    = NOW()
+  WHERE match_id = p_match_id;
+END;
+$$;
+
+-- Counterpart to reopenMatchAction — clears points when a match is reopened
+-- for a stat correction, so stale points don't linger on the leaderboard.
+CREATE OR REPLACE FUNCTION reverse_predictions_for_match(p_match_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'manager')) THEN
+    RAISE EXCEPTION 'not authorized';
+  END IF;
+
+  UPDATE score_predictions SET points_earned = NULL, updated_at = NOW() WHERE match_id = p_match_id;
+END;
+$$;
+
+
+-- ─── 9. Least-privilege grants ────────────────────────────────────────────
 
 GRANT EXECUTE ON FUNCTION calculate_player_match_points TO authenticated;
 GRANT EXECUTE ON FUNCTION recalculate_matchday_team_points TO authenticated;
 GRANT EXECUTE ON FUNCTION recalculate_single_team_points TO authenticated;
 GRANT EXECUTE ON FUNCTION reverse_matchday_team_points TO authenticated;
+GRANT EXECUTE ON FUNCTION calculate_prediction_points TO authenticated;
+GRANT EXECUTE ON FUNCTION score_predictions_for_match TO authenticated;
+GRANT EXECUTE ON FUNCTION reverse_predictions_for_match TO authenticated;
 REVOKE EXECUTE ON FUNCTION recalculate_matchday_team_points FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION recalculate_single_team_points FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION reverse_matchday_team_points FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION score_predictions_for_match FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION reverse_predictions_for_match FROM PUBLIC, anon;

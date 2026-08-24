@@ -13,6 +13,8 @@ import { cn, formatPrice, getPositionColor } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { saveTeam } from "@/lib/actions/team";
 import type { Player } from "@/lib/supabase/types";
+import { useFeatureFlag } from "@/lib/hooks/useFeatureFlag";
+import { FeatureDisabled } from "@/components/ui/FeatureDisabled";
 
 const FORMATIONS: Record<string, { GK: number; DEF: number; MID: number; FWD: number }> = {
   "4-3-3": { GK: 1, DEF: 4, MID: 3, FWD: 3 },
@@ -24,6 +26,7 @@ const FORMATIONS: Record<string, { GK: number; DEF: number; MID: number; FWD: nu
 const BUDGET = 100_000_000;
 
 export default function MyTeamPage() {
+  const fantasyTeamsEnabled = useFeatureFlag("fantasyTeams");
   const [formation, setFormation]       = useState<keyof typeof FORMATIONS>("4-3-3");
   const [selectedIds, setSelectedIds]   = useState<string[]>([]);
   const [captainId, setCaptainId]       = useState<string>("");
@@ -314,6 +317,10 @@ export default function MyTeamPage() {
         })}
       </div>
     );
+  }
+
+  if (!fantasyTeamsEnabled) {
+    return <FeatureDisabled title="Fantasy Teams" message="Squad-building is temporarily paused. Try Score Predictions instead." />;
   }
 
   return (

@@ -436,6 +436,78 @@ GRANT EXECUTE ON FUNCTION cast_poll_vote(UUID, TEXT) TO authenticated;
 REVOKE EXECUTE ON FUNCTION cast_poll_vote(UUID, TEXT) FROM PUBLIC, anon;
 
 -- =============================================
+-- SCORE PREDICTIONS TABLE — lightweight game mode for users who don't want
+-- to manage a full fantasy squad: predict a match's final score, earn points
+-- based on accuracy once the match finishes. See scoring.sql for the points
+-- formula and the score_predictions_for_match/reverse_predictions_for_match
+-- functions the admin panel calls when a match is finished/reopened.
+-- =============================================
+CREATE TABLE IF NOT EXISTS score_predictions (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  match_id UUID REFERENCES matches(id) ON DELETE CASCADE NOT NULL,
+  predicted_home_score INTEGER NOT NULL CHECK (predicted_home_score BETWEEN 0 AND 20),
+  predicted_away_score INTEGER NOT NULL CHECK (predicted_away_score BETWEEN 0 AND 20),
+  points_earned INTEGER,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, match_id)
+);
+
+ALTER TABLE score_predictions ENABLE ROW LEVEL SECURITY;
+
+-- Your own predictions are always visible to you (so you can see/edit them
+-- before kickoff). Other users' predictions only become visible once the
+-- match has kicked off — hiding them beforehand stops copying picks.
+CREATE POLICY "own or post-kickoff predictions viewable" ON score_predictions FOR SELECT USING (
+  auth.uid() = user_id
+  OR EXISTS (SELECT 1 FROM matches WHERE id = match_id AND status IN ('live', 'finished'))
+);
+CREATE POLICY "admin_write_predictions" ON score_predictions FOR ALL USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = ANY (ARRAY['admin', 'manager']))
+);
+-- Deliberately no direct INSERT/UPDATE policy for regular users — writes go
+-- through submit_score_prediction below, which enforces the feature flag and
+-- the kickoff cutoff server-side (the same reason cast_poll_vote above and
+-- the transfer RPCs in scoring.sql exist as RPCs rather than raw table
+-- writes: a client-side-only gate is trivially bypassed via direct RPC/REST
+-- calls, so the check has to live in the function itself).
+
+CREATE OR REPLACE FUNCTION submit_score_prediction(p_match_id UUID, p_home_score INT, p_away_score INT)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_user   UUID := auth.uid();
+  v_status TEXT;
+BEGIN
+  IF v_user IS NULL THEN RETURN jsonb_build_object('ok', false, 'error', 'not authenticated'); END IF;
+
+  IF (SELECT (value->>'scorePredictions')::boolean FROM app_config WHERE key = 'feature_flags') IS FALSE THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'score predictions are currently disabled');
+  END IF;
+
+  IF p_home_score IS NULL OR p_away_score IS NULL OR p_home_score < 0 OR p_home_score > 20 OR p_away_score < 0 OR p_away_score > 20 THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'invalid score');
+  END IF;
+
+  SELECT status INTO v_status FROM matches WHERE id = p_match_id;
+  IF v_status IS NULL THEN RETURN jsonb_build_object('ok', false, 'error', 'match not found'); END IF;
+  IF v_status <> 'scheduled' THEN RETURN jsonb_build_object('ok', false, 'error', 'predictions are closed for this match'); END IF;
+
+  INSERT INTO score_predictions (user_id, match_id, predicted_home_score, predicted_away_score)
+  VALUES (v_user, p_match_id, p_home_score, p_away_score)
+  ON CONFLICT (user_id, match_id) DO UPDATE
+    SET predicted_home_score = EXCLUDED.predicted_home_score,
+        predicted_away_score = EXCLUDED.predicted_away_score,
+        updated_at = NOW();
+
+  RETURN jsonb_build_object('ok', true);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION submit_score_prediction(UUID, INT, INT) TO authenticated;
+REVOKE EXECUTE ON FUNCTION submit_score_prediction(UUID, INT, INT) FROM PUBLIC, anon;
+
+-- =============================================
 -- APP CONFIG TABLE — feature flags
 -- =============================================
 CREATE TABLE IF NOT EXISTS app_config (
@@ -452,7 +524,7 @@ CREATE POLICY "admin_write_config" ON app_config FOR ALL USING (
 
 INSERT INTO app_config (key, value) VALUES (
   'feature_flags',
-  '{"liveScoring":true,"transferWindow":true,"chat":true,"polls":true,"leagueCreation":true,"notifications":true,"marketplace":true,"achievements":true}'
+  '{"liveScoring":true,"transferWindow":true,"chat":true,"polls":true,"leagueCreation":true,"notifications":true,"marketplace":true,"achievements":true,"fantasyTeams":true,"scorePredictions":true}'
 ) ON CONFLICT (key) DO NOTHING;
 
 -- =============================================

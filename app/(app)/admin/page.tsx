@@ -42,6 +42,8 @@ import { cn, formatPrice, getPositionColor } from "@/lib/utils";
 
 
 const FLAG_DEFS = [
+  { key: "fantasyTeams",    label: "Fantasy Team Game",  desc: "Let users build & manage a fantasy squad (My Team, Player Market)" },
+  { key: "scorePredictions", label: "Score Predictions", desc: "Let users predict match scorelines instead of managing a team" },
   { key: "liveScoring",     label: "Live Scoring",       desc: "Stream live fantasy points during matches" },
   { key: "transferWindow",  label: "Transfer Window",    desc: "Allow players to buy/sell in the market" },
   { key: "chat",            label: "Matchday Chat",      desc: "Enable community chat during live matches" },
@@ -179,6 +181,7 @@ export default function AdminPage() {
   const [flags, setFlags] = useState<Record<string, boolean>>({
     liveScoring: true, transferWindow: true, chat: true, polls: true,
     leagueCreation: true, notifications: true, marketplace: true, achievements: true,
+    fantasyTeams: true, scorePredictions: true,
   });
   const [flagSaved, setFlagSaved]   = useState(false);
   const [flagSaving, setFlagSaving] = useState(false);
@@ -215,7 +218,7 @@ export default function AdminPage() {
           .select("value")
           .eq("key", "feature_flags")
           .single();
-        if (data?.value) setFlags(data.value as Record<string, boolean>);
+        if (data?.value) setFlags((prev) => ({ ...prev, ...(data.value as Record<string, boolean>) }));
       } catch { /* use defaults */ }
     }
     loadFlags();

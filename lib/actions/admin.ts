@@ -203,6 +203,7 @@ export async function saveMatchStatsAction(
   }).eq("id", matchId);
 
   await supabase.rpc("recalculate_matchday_team_points", { p_matchday: matchday, p_season: season });
+  await supabase.rpc("score_predictions_for_match", { p_match_id: matchId });
 
   return { success: true };
 }
@@ -346,6 +347,7 @@ export async function reopenMatchAction(matchId: string, matchday: number, seaso
 
   // Reverse points before deleting stats — weekly_points is the match's contribution
   await supabase.rpc("reverse_matchday_team_points", { p_matchday: matchday, p_season: season });
+  await supabase.rpc("reverse_predictions_for_match", { p_match_id: matchId });
 
   // Delete all saved stats for this match
   await supabase.from("player_match_stats").delete().eq("match_id", matchId);
