@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { TopBar } from "@/components/layout/TopBar";
 import { MessageSquare, Send, BarChart2, Star, Flame, Trophy, Trash2, Plus, Lock, X } from "lucide-react";
@@ -22,8 +23,12 @@ interface ChatMsg {
 
 const emojis = ["🔥", "⚽", "🏏", "🏉", "💪", "👑", "🎯", "😂", "❤️", "🏆"];
 
-export default function CommunityPage() {
-  const [activeTab, setActiveTab] = useState<"chat" | "polls" | "discussions">("chat");
+function CommunityPageContent() {
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<"chat" | "polls" | "discussions">(
+    initialTab === "polls" || initialTab === "discussions" ? initialTab : "chat"
+  );
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [pollData, setPollData] = useState<{ id: string; question: string; options: { label: string; votes: number }[]; totalVotes: number; voted: string | null; groupName: string | null }[]>([]);
@@ -37,6 +42,17 @@ export default function CommunityPage() {
   const chatEnabled = useFeatureFlag("chat");
   const pollsEnabled = useFeatureFlag("polls");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // The Chat/Polls sidebar links both point at this same route with
+  // different ?tab= values, so navigating between them is a client-side
+  // transition that reuses this component instance rather than remounting
+  // it — the useState initializer above only runs once, on first mount, so
+  // without this the tab silently stays wherever it was set on the first
+  // visit no matter which link is clicked afterward.
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "chat" || tab === "polls" || tab === "discussions") setActiveTab(tab);
+  }, [searchParams]);
 
   // Scroll to bottom whenever messages change
   useEffect(() => {
@@ -627,5 +643,13 @@ export default function CommunityPage() {
         </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+export default function CommunityPage() {
+  return (
+    <Suspense fallback={null}>
+      <CommunityPageContent />
+    </Suspense>
   );
 }

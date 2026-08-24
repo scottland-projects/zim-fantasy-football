@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { Logo } from "@/components/ui/Logo";
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Users, Trophy, ShoppingCart,
-  Radio, MessageSquare, User, Settings, Shield,
+  Radio, MessageSquare, MessageCircle, User, Settings, Shield,
   ChevronRight, LogOut, X, BarChart2, Target, Gamepad2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -15,26 +14,6 @@ import { cn } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-store";
 import { createClient } from "@/lib/supabase/client";
 import { useFeatureFlag } from "@/lib/hooks/useFeatureFlag";
-
-function useHasLiveMatch() {
-  const [isLive, setIsLive] = useState(false);
-  useEffect(() => {
-    async function check() {
-      try {
-        const supabase = createClient();
-        const { data } = await supabase
-          .from("matches")
-          .select("id")
-          .eq("sport", "football")
-          .eq("status", "live")
-          .limit(1);
-        setIsLive(Array.isArray(data) && data.length > 0);
-      } catch { /* keep default */ }
-    }
-    check();
-  }, []);
-  return isLive;
-}
 
 interface SidebarProps {
   username?: string;
@@ -45,30 +24,33 @@ interface SidebarProps {
   isManager?: boolean;
 }
 
-type NavFlag = "fantasyTeams" | "scorePredictions" | null;
-interface NavItem { href: string; label: string; icon: LucideIcon; live: boolean; flag: NavFlag }
+type NavFlag = "fantasyTeams" | "scorePredictions" | "chat" | "polls" | null;
+interface NavItem { href: string; label: string; icon: LucideIcon; flag: NavFlag }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard",    icon: LayoutDashboard, live: false, flag: null },
-  { href: "/games",     label: "Games",         icon: Gamepad2,        live: false, flag: null },
-  { href: "/my-team",   label: "My Team",       icon: Users,           live: false, flag: "fantasyTeams" },
-  { href: "/market",    label: "Player Market", icon: ShoppingCart,    live: false, flag: "fantasyTeams" },
-  { href: "/predictions", label: "Predictions", icon: Target,          live: false, flag: "scorePredictions" },
-  { href: "/leagues",   label: "Groups",        icon: Trophy,          live: false, flag: null },
-  { href: "/live",         label: "Football Live", icon: Radio,       live: true,  flag: null },
-  { href: "/match-stats", label: "Football Stats", icon: BarChart2,    live: false, flag: null },
-  { href: "/community",   label: "Community",    icon: MessageSquare, live: false, flag: null },
-  { href: "/profile",   label: "My Profile",    icon: User,            live: false, flag: null },
+  { href: "/dashboard", label: "Dashboard",    icon: LayoutDashboard, flag: null },
+  { href: "/games",     label: "Games",         icon: Gamepad2,        flag: null },
+  { href: "/my-team",   label: "My Team",       icon: Users,           flag: "fantasyTeams" },
+  { href: "/market",    label: "Player Market", icon: ShoppingCart,    flag: "fantasyTeams" },
+  { href: "/predictions", label: "Predictions", icon: Target,          flag: "scorePredictions" },
+  { href: "/leagues",   label: "Groups",        icon: Trophy,          flag: null },
+  { href: "/community?tab=chat",  label: "Chat",  icon: MessageCircle, flag: "chat" },
+  { href: "/community?tab=polls", label: "Polls", icon: BarChart2,     flag: "polls" },
+  { href: "/community",   label: "Community",    icon: MessageSquare, flag: null },
+  { href: "/profile",   label: "My Profile",    icon: User,            flag: null },
 ];
 
 function SidebarContent({ username, level, xp, avatarUrl, isAdmin, isManager, onNavigate }: SidebarProps & { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const hasLiveMatch = useHasLiveMatch();
   const fantasyTeamsEnabled = useFeatureFlag("fantasyTeams");
   const scorePredictionsEnabled = useFeatureFlag("scorePredictions");
+  const chatEnabled = useFeatureFlag("chat");
+  const pollsEnabled = useFeatureFlag("polls");
   const visibleNavItems = NAV_ITEMS.filter((item) => {
     if (item.flag === "fantasyTeams") return fantasyTeamsEnabled;
     if (item.flag === "scorePredictions") return scorePredictionsEnabled;
+    if (item.flag === "chat") return chatEnabled;
+    if (item.flag === "polls") return pollsEnabled;
     return true;
   });
 
@@ -99,15 +81,11 @@ function SidebarContent({ username, level, xp, avatarUrl, isAdmin, isManager, on
         </p>
         {visibleNavItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-          const showBadge = item.live && hasLiveMatch;
           return (
             <Link key={item.href} href={item.href} onClick={onNavigate}
               className={cn("sidebar-link group", isActive && "sidebar-link-active")}>
               <item.icon className={cn("w-4 h-4 shrink-0", isActive && "text-zff-green")} />
               <span className="flex-1">{item.label}</span>
-              {showBadge && (
-                <span className="live-badge">LIVE</span>
-              )}
               {isActive && <ChevronRight className="w-3 h-3 text-zff-green opacity-60" />}
             </Link>
           );
