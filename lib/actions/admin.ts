@@ -117,8 +117,11 @@ export async function cancelMatchLiveAction(matchId: string) {
   const { data: match } = await supabase.from("matches").select("matchday").eq("id", matchId).single();
   if (!match) return { error: "Match not found" };
 
-  // Revert status
-  await supabase.from("matches").update({ status: "scheduled" }).eq("id", matchId);
+  // Revert status. home_score/away_score are nulled too — football never sets
+  // them before finishing (this is a no-op there), but cricket/rugby matches
+  // start live at 0-0 (see goLivePredictionOnlyMatchAction), so without this
+  // a cancelled match would keep showing a stale "0-0" instead of "VS".
+  await supabase.from("matches").update({ status: "scheduled", home_score: null, away_score: null }).eq("id", matchId);
 
   // Delete the "now LIVE!" notifications the trigger already sent
   await supabase.from("notifications")
@@ -187,6 +190,51 @@ export async function finishPredictionOnlyMatchAction(matchId: string, homeScore
   }).eq("id", matchId);
 
   await supabase.rpc("score_predictions_for_match", { p_match_id: matchId });
+
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+// Puts a cricket/rugby fixture into a genuinely live state with a running
+// score the admin can update as play progresses, instead of jumping straight
+// from "scheduled" to a single final-score entry. Starts the score at 0-0
+// (never null) so the /live page always has a number to render.
+export async function goLivePredictionOnlyMatchAction(matchId: string) {
+  const { error, supabase } = await requireAdmin();
+  if (error || !supabase) return { error: error ?? "Unknown error" };
+
+  const { data: match } = await supabase.from("matches").select("sport, status").eq("id", matchId).single();
+  if (!match) return { error: "Match not found" };
+  if (match.sport === "football") return { error: "Football matches must be started via the Live flow" };
+  if (match.status !== "scheduled") return { error: "Match is not scheduled" };
+
+  await supabase.from("matches").update({
+    status: "live",
+    home_score: 0,
+    away_score: 0,
+    kickoff_time: new Date().toISOString(),
+  }).eq("id", matchId);
+
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+// Updates the running score of a live cricket/rugby match without finishing
+// it — the admin-facing counterpart to the realtime score banner on /live.
+export async function updateLiveScorePredictionOnlyAction(matchId: string, homeScore: number, awayScore: number) {
+  if (!Number.isInteger(homeScore) || !Number.isInteger(awayScore) || homeScore < 0 || awayScore < 0 || homeScore > 999 || awayScore > 999) {
+    return { error: "Invalid score" };
+  }
+
+  const { error, supabase } = await requireAdmin();
+  if (error || !supabase) return { error: error ?? "Unknown error" };
+
+  const { data: match } = await supabase.from("matches").select("sport, status").eq("id", matchId).single();
+  if (!match) return { error: "Match not found" };
+  if (match.sport === "football") return { error: "Football matches must be scored via the Live flow" };
+  if (match.status !== "live") return { error: "Match is not live" };
+
+  await supabase.from("matches").update({ home_score: homeScore, away_score: awayScore }).eq("id", matchId);
 
   revalidatePath("/admin");
   return { success: true };

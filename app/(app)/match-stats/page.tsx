@@ -3,9 +3,36 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { TopBar } from "@/components/layout/TopBar";
-import { BarChart2, CheckCircle2, Clock, TrendingUp, TrendingDown } from "lucide-react";
+import { BarChart2, CheckCircle2, Clock, TrendingUp, TrendingDown, Table2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn, getPositionColor } from "@/lib/utils";
+
+type Sport = "football" | "cricket" | "rugby";
+
+const SPORT_TABS: { id: Sport; label: string; emoji: string }[] = [
+  { id: "football", label: "Football", emoji: "⚽" },
+  { id: "cricket",  label: "Cricket",  emoji: "🏏" },
+  { id: "rugby",    label: "Rugby",    emoji: "🏉" },
+];
+
+function SportTabs({ value, onChange }: { value: Sport; onChange: (s: Sport) => void }) {
+  return (
+    <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
+      {SPORT_TABS.map((s) => (
+        <button
+          key={s.id}
+          onClick={() => onChange(s.id)}
+          className={cn(
+            "px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5",
+            value === s.id ? "bg-white text-zff-black shadow-sm" : "text-muted-foreground hover:text-zff-black"
+          )}
+        >
+          <span>{s.emoji}</span> {s.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 interface Match {
   id: string;
@@ -32,9 +59,45 @@ interface PlayerStat {
   total_points: number;
 }
 
+interface TeamStat {
+  name: string;
+  played: number;
+  won: number;
+  lost: number;
+  drawn: number;
+  for: number;
+  against: number;
+}
+
 type StatSort = "total_points" | "goals" | "assists" | "clean_sheets" | "minutes_played";
 
+// Cricket and rugby have no player roster in this app — matches there only
+// carry a final score for Score Predictions (see finishPredictionOnlyMatchAction
+// in lib/actions/admin.ts) — so their "stats" is a team standings table
+// derived from finished matches, instead of football's per-player table.
+function buildTeamStats(finished: Match[]): TeamStat[] {
+  const table = new Map<string, TeamStat>();
+  function row(name: string): TeamStat {
+    let r = table.get(name);
+    if (!r) { r = { name, played: 0, won: 0, lost: 0, drawn: 0, for: 0, against: 0 }; table.set(name, r); }
+    return r;
+  }
+  for (const m of finished) {
+    if (m.home_score === null || m.away_score === null) continue;
+    const home = row(m.home_team);
+    const away = row(m.away_team);
+    home.played++; away.played++;
+    home.for += m.home_score; home.against += m.away_score;
+    away.for += m.away_score; away.against += m.home_score;
+    if (m.home_score > m.away_score) { home.won++; away.lost++; }
+    else if (m.home_score < m.away_score) { away.won++; home.lost++; }
+    else { home.drawn++; away.drawn++; }
+  }
+  return [...table.values()].sort((a, b) => (b.won * 2 + b.drawn) - (a.won * 2 + a.drawn) || (b.for - b.against) - (a.for - a.against));
+}
+
 export default function MatchStatsPage() {
+  const [sport, setSport]           = useState<Sport>("football");
   const [matches, setMatches]       = useState<Match[]>([]);
   const [playerStats, setPlayerStats] = useState<PlayerStat[]>([]);
   const [loading, setLoading]       = useState(true);
@@ -43,27 +106,39 @@ export default function MatchStatsPage() {
   const [sortDir, setSortDir]       = useState<"desc" | "asc">("desc");
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
+      setLoading(true);
       try {
         const supabase = createClient();
-        const [{ data: matchData }, { data: statsData }] = await Promise.all([
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (supabase as any).from("matches").select("*").eq("sport", "football").order("kickoff_time", { ascending: false }),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (supabase as any).from("players").select("id, name, position, goals, assists, clean_sheets, minutes_played, yellow_cards, red_cards, total_points").order("total_points", { ascending: false }),
-        ]);
-        if (matchData) setMatches(matchData);
-        if (statsData) setPlayerStats(statsData);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sb = supabase as any;
+        if (sport === "football") {
+          const [{ data: matchData }, { data: statsData }] = await Promise.all([
+            sb.from("matches").select("*").eq("sport", "football").order("kickoff_time", { ascending: false }),
+            sb.from("players").select("id, name, position, goals, assists, clean_sheets, minutes_played, yellow_cards, red_cards, total_points").order("total_points", { ascending: false }),
+          ]);
+          if (cancelled) return;
+          if (matchData) setMatches(matchData);
+          if (statsData) setPlayerStats(statsData);
+        } else {
+          const { data: matchData } = await sb.from("matches").select("*").eq("sport", sport).order("kickoff_time", { ascending: false });
+          if (cancelled) return;
+          if (matchData) setMatches(matchData);
+          setPlayerStats([]);
+        }
       } catch { /* empty state */ } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     load();
-  }, []);
+    return () => { cancelled = true; };
+  }, [sport]);
 
   const results  = matches.filter(m => m.status === "finished");
   const fixtures = matches.filter(m => m.status !== "finished").reverse();
   const totalGoals = results.reduce((s, m) => s + (m.home_score ?? 0) + (m.away_score ?? 0), 0);
+  const teamStats = sport !== "football" ? buildTeamStats(results) : [];
 
   const list = tab === "results" ? results : fixtures;
 
@@ -81,19 +156,23 @@ export default function MatchStatsPage() {
     return sortDir === "desc" ? <TrendingDown className="w-3 h-3 inline ml-0.5" /> : <TrendingUp className="w-3 h-3 inline ml-0.5" />;
   }
 
+  const sportLabel = sport === "football" ? "Football" : sport === "cricket" ? "Cricket" : "Rugby";
+  const unitLabel = sport === "cricket" ? "Runs" : sport === "rugby" ? "Points" : "Goals";
+
   return (
     <div className="min-h-screen">
-      <TopBar title="Football Match Stats" subtitle="Football results, fixtures & performance" />
+      <TopBar title={`${sportLabel} Match Stats`} subtitle={`${sportLabel} results, fixtures & performance`} />
 
       <div className="p-4 sm:p-6 lg:p-8 space-y-5">
+        <SportTabs value={sport} onChange={setSport} />
 
         {/* Season summary */}
         {results.length > 0 && (
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
             {[
               { label: "Matchdays Played", short: "MD",     value: results.length, cls: "text-zff-black" },
-              { label: "Total Goals",      short: "Goals",  value: totalGoals,     cls: "text-zff-green" },
-              { label: "Avg Goals / Match",short: "Avg",    value: results.length ? (totalGoals / results.length).toFixed(1) : "0.0", cls: "text-amber-500" },
+              { label: `Total ${unitLabel}`, short: unitLabel, value: totalGoals,     cls: "text-zff-green" },
+              { label: `Avg ${unitLabel} / Match`,short: "Avg",    value: results.length ? (totalGoals / results.length).toFixed(1) : "0.0", cls: "text-amber-500" },
             ].map(s => (
               <div key={s.label} className="glass-card p-2 sm:p-4 text-center">
                 <p className={cn("text-xl sm:text-2xl font-bold", s.cls)}>{s.value}</p>
@@ -152,6 +231,8 @@ export default function MatchStatsPage() {
                     <div className="flex items-center gap-2">
                       {m.status === "finished"
                         ? <span className="text-xs text-muted-foreground flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-green-400" />{dateStr}</span>
+                        : m.status === "live"
+                        ? <span className="text-xs text-red-500 font-semibold flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />LIVE</span>
                         : <span className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" />{dateStr}</span>
                       }
                     </div>
@@ -163,15 +244,15 @@ export default function MatchStatsPage() {
                     </span>
                     <span className="font-semibold flex-1 text-right truncate text-zff-black">{m.away_team}</span>
                   </div>
-                  {!hasScore && <p className="text-center text-xs text-muted-foreground mt-2">{timeStr} CAT</p>}
+                  {!hasScore && m.status !== "live" && <p className="text-center text-xs text-muted-foreground mt-2">{timeStr} CAT</p>}
                 </motion.div>
               );
             })}
           </div>
         )}
 
-        {/* Player season stats */}
-        {sortedStats.length > 0 && (
+        {/* Player season stats (football only) */}
+        {sport === "football" && sortedStats.length > 0 && (
           <div className="glass-card overflow-hidden">
             <div className="p-5 border-b border-slate-200">
               <h2 className="font-bold text-zff-black text-sm flex items-center gap-2">
@@ -248,6 +329,82 @@ export default function MatchStatsPage() {
                       <td className="px-4 py-3 text-right text-sm text-zff-black">{p.assists}</td>
                       <td className="px-4 py-3 text-right text-sm text-zff-black">{p.clean_sheets}</td>
                       <td className="px-4 py-3 text-right text-sm text-muted-foreground">{p.minutes_played}</td>
+                    </motion.tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Team season stats (cricket / rugby) */}
+        {sport !== "football" && teamStats.length > 0 && (
+          <div className="glass-card overflow-hidden">
+            <div className="p-5 border-b border-slate-200">
+              <h2 className="font-bold text-zff-black text-sm flex items-center gap-2">
+                <Table2 className="w-4 h-4 text-zff-green" /> Team Standings
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Based on finished {sportLabel.toLowerCase()} matches this season</p>
+            </div>
+
+            {/* ── Mobile card list ── */}
+            <div className="sm:hidden divide-y divide-slate-100">
+              {teamStats.map((t, i) => (
+                <motion.div key={t.name} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }}
+                  className="flex items-center gap-3 px-4 py-3">
+                  <div className="w-6 h-6 rounded-lg bg-zff-green/10 flex items-center justify-center text-[10px] font-bold text-zff-green shrink-0">
+                    {i + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-semibold text-zff-black truncate block">{t.name}</span>
+                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground mt-1">
+                      <span>{t.played}P</span>
+                      <span className="text-zff-green">{t.won}W</span>
+                      <span>{t.drawn}D</span>
+                      <span className="text-red-400">{t.lost}L</span>
+                      <span>{t.for}-{t.against}</span>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-base font-bold text-zff-green">{t.won * 2 + t.drawn}</p>
+                    <p className="text-[9px] text-muted-foreground">pts</p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* ── Desktop table ── */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-100/20 border-b border-slate-200">
+                  <tr>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Team</th>
+                    <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground">P</th>
+                    <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground">W</th>
+                    <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground">D</th>
+                    <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground">L</th>
+                    <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground">For</th>
+                    <th className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground">Against</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-zff-green">Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {teamStats.map((t, i) => (
+                    <motion.tr key={t.name} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }}
+                      className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-lg bg-zff-green/10 flex items-center justify-center text-[10px] font-bold text-zff-green shrink-0">{i + 1}</div>
+                          <span className="text-sm font-medium text-zff-black">{t.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-right text-sm text-zff-black">{t.played}</td>
+                      <td className="px-3 py-3 text-right text-sm text-zff-black">{t.won}</td>
+                      <td className="px-3 py-3 text-right text-sm text-zff-black">{t.drawn}</td>
+                      <td className="px-3 py-3 text-right text-sm text-zff-black">{t.lost}</td>
+                      <td className="px-3 py-3 text-right text-sm text-muted-foreground">{t.for}</td>
+                      <td className="px-3 py-3 text-right text-sm text-muted-foreground">{t.against}</td>
+                      <td className="px-4 py-3 text-right text-sm font-bold text-zff-green">{t.won * 2 + t.drawn}</td>
                     </motion.tr>
                   ))}
                 </tbody>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { saveFlagsAction, updateMatchStatusAction, cancelMatchLiveAction, saveFixtureAction, saveMatchStatsAction, savePrizesAction, updateUserRoleAction, broadcastNotificationAction, addPlayerAction, editPlayerAction, deletePlayerAction, adminResetPasswordAction, logMatchEventAction, deleteMatchEventAction, reopenMatchAction, listUserEmailsAction, finishPredictionOnlyMatchAction, reopenPredictionOnlyMatchAction } from "@/lib/actions/admin";
+import { saveFlagsAction, updateMatchStatusAction, cancelMatchLiveAction, saveFixtureAction, saveMatchStatsAction, savePrizesAction, updateUserRoleAction, broadcastNotificationAction, addPlayerAction, editPlayerAction, deletePlayerAction, adminResetPasswordAction, logMatchEventAction, deleteMatchEventAction, reopenMatchAction, listUserEmailsAction, finishPredictionOnlyMatchAction, reopenPredictionOnlyMatchAction, goLivePredictionOnlyMatchAction, updateLiveScorePredictionOnlyAction } from "@/lib/actions/admin";
 import { deleteLeagueAction } from "@/lib/actions/leagues";
 import { motion, AnimatePresence } from "framer-motion";
 import { TopBar } from "@/components/layout/TopBar";
@@ -172,6 +172,12 @@ export default function AdminPage() {
   const [scoreEntryMatch, setScoreEntryMatch] = useState<string | null>(null);
   const [scoreEntryForm, setScoreEntryForm] = useState({ home: "", away: "" });
   const [scoreEntrySaving, setScoreEntrySaving] = useState(false);
+  // Running score editor for a *live* cricket/rugby match (distinct from
+  // scoreEntry* above, which is the one-shot "enter final score & finish" form).
+  const [goingLive, setGoingLive] = useState<string | null>(null);
+  const [liveUpdateMatch, setLiveUpdateMatch] = useState<string | null>(null);
+  const [liveUpdateForm, setLiveUpdateForm] = useState({ home: "", away: "" });
+  const [liveUpdateSaving, setLiveUpdateSaving] = useState(false);
   // ── Live Scoring ─────────────────────────────────────────────────────────
   const [liveScoreMatch, setLiveScoreMatch] = useState<AdminMatch | null>(null);
   const [liveEvents, setLiveEvents] = useState<{ id: string; minute: number; event_type: string; side: string; player_name: string }[]>([]);
@@ -446,6 +452,32 @@ export default function AdminPage() {
       showToast("success", "Result saved and predictions scored");
     } catch { showToast("error", "Failed to save result"); }
     finally { setScoreEntrySaving(false); }
+  }
+
+  async function goLiveNonFootball(matchId: string) {
+    setGoingLive(matchId);
+    try {
+      const result = await goLivePredictionOnlyMatchAction(matchId);
+      if (result.error) { showToast("error", result.error); return; }
+      setDbMatches(prev => prev.map(m => m.id === matchId ? { ...m, status: "live", home_score: 0, away_score: 0 } : m));
+      showToast("success", "Match is now live");
+    } catch { showToast("error", "Failed to start match"); }
+    finally { setGoingLive(null); }
+  }
+
+  async function saveLiveScoreUpdate(matchId: string) {
+    const home = parseInt(liveUpdateForm.home, 10);
+    const away = parseInt(liveUpdateForm.away, 10);
+    if (isNaN(home) || isNaN(away) || home < 0 || away < 0) { showToast("error", "Enter a valid score for both teams"); return; }
+    setLiveUpdateSaving(true);
+    try {
+      const result = await updateLiveScorePredictionOnlyAction(matchId, home, away);
+      if (result.error) { showToast("error", result.error); return; }
+      setDbMatches(prev => prev.map(m => m.id === matchId ? { ...m, home_score: home, away_score: away } : m));
+      setLiveUpdateMatch(null);
+      showToast("success", "Score updated");
+    } catch { showToast("error", "Failed to update score"); }
+    finally { setLiveUpdateSaving(false); }
   }
 
   async function reopenNonFootballMatch(matchId: string) {
@@ -1110,10 +1142,33 @@ export default function AdminPage() {
                         {m.sport !== "football" ? (
                           <>
                             {m.status === "scheduled" && (
-                              <button onClick={() => { setScoreEntryMatch(scoreEntryMatch === m.id ? null : m.id); setScoreEntryForm({ home: "", away: "" }); }}
-                                className="text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-lg bg-zff-green/10 border border-zff-green/30 text-zff-green hover:bg-zff-green/20 transition-colors flex items-center gap-1 whitespace-nowrap">
-                                <Edit className="w-3 h-3" /> Enter Score
+                              <button onClick={() => goLiveNonFootball(m.id)} disabled={goingLive === m.id}
+                                className="text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 hover:bg-red-500/20 transition-colors disabled:opacity-50 whitespace-nowrap">
+                                {goingLive === m.id ? "…" : "▶ Live"}
                               </button>
+                            )}
+                            {m.status === "live" && (
+                              <div className="flex items-center gap-1.5">
+                                <button onClick={() => { setLiveUpdateMatch(liveUpdateMatch === m.id ? null : m.id); setLiveUpdateForm({ home: String(m.home_score ?? 0), away: String(m.away_score ?? 0) }); setScoreEntryMatch(null); }}
+                                  className="text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 hover:bg-red-500/20 transition-colors flex items-center gap-1 whitespace-nowrap">
+                                  <Zap className="w-3 h-3" /> Update Score
+                                </button>
+                                <button onClick={() => { setScoreEntryMatch(scoreEntryMatch === m.id ? null : m.id); setScoreEntryForm({ home: String(m.home_score ?? 0), away: String(m.away_score ?? 0) }); setLiveUpdateMatch(null); }}
+                                  className="text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-lg bg-zff-green/10 border border-zff-green/30 text-zff-green hover:bg-zff-green/20 transition-colors flex items-center gap-1 whitespace-nowrap">
+                                  <Edit className="w-3 h-3" /> Finish
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    setStatusUpdating(m.id);
+                                    try { await cancelMatchLiveAction(m.id); setDbMatches(prev => prev.map(x => x.id === m.id ? { ...x, status: "scheduled", home_score: null, away_score: null } : x)); }
+                                    finally { setStatusUpdating(null); }
+                                  }}
+                                  disabled={statusUpdating === m.id}
+                                  className="text-[10px] font-bold px-2 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-muted-foreground hover:border-red-400/40 hover:text-red-400 transition-colors whitespace-nowrap disabled:opacity-50"
+                                  title="Cancel live — reverts to scheduled">
+                                  ✕
+                                </button>
+                              </div>
                             )}
                             {m.status === "finished" && (
                               <button onClick={() => reopenNonFootballMatch(m.id)} disabled={statusUpdating === m.id}
@@ -1143,7 +1198,7 @@ export default function AdminPage() {
                                 <button
                                   onClick={async () => {
                                     setStatusUpdating(m.id);
-                                    try { await cancelMatchLiveAction(m.id); setDbMatches(prev => prev.map(x => x.id === m.id ? { ...x, status: "scheduled" } : x)); }
+                                    try { await cancelMatchLiveAction(m.id); setDbMatches(prev => prev.map(x => x.id === m.id ? { ...x, status: "scheduled", home_score: null, away_score: null } : x)); }
                                     finally { setStatusUpdating(null); }
                                   }}
                                   disabled={statusUpdating === m.id}
@@ -1163,6 +1218,19 @@ export default function AdminPage() {
                         )}
                       </div>
                     </div>
+                    {liveUpdateMatch === m.id && (
+                      <div className="mt-3 flex items-center gap-2 justify-center bg-red-50 border border-red-200 rounded-lg p-3">
+                        <span className="text-xs text-muted-foreground truncate max-w-[80px] text-right">{m.home_team}</span>
+                        <input type="number" min={0} value={liveUpdateForm.home} onChange={e => setLiveUpdateForm(p => ({ ...p, home: e.target.value }))} className="input w-16 text-center px-2 py-1.5 text-sm" placeholder="-" />
+                        <span className="text-muted-foreground text-xs">—</span>
+                        <input type="number" min={0} value={liveUpdateForm.away} onChange={e => setLiveUpdateForm(p => ({ ...p, away: e.target.value }))} className="input w-16 text-center px-2 py-1.5 text-sm" placeholder="-" />
+                        <span className="text-xs text-muted-foreground truncate max-w-[80px]">{m.away_team}</span>
+                        <button onClick={() => saveLiveScoreUpdate(m.id)} disabled={liveUpdateSaving} className="btn-primary text-xs py-1.5 px-3 ml-2 disabled:opacity-60">
+                          {liveUpdateSaving ? "Saving…" : "Update"}
+                        </button>
+                        <button onClick={() => setLiveUpdateMatch(null)} className="text-xs text-muted-foreground hover:text-zff-black px-2">Cancel</button>
+                      </div>
+                    )}
                     {scoreEntryMatch === m.id && (
                       <div className="mt-3 flex items-center gap-2 justify-center bg-slate-50 border border-slate-200 rounded-lg p-3">
                         <span className="text-xs text-muted-foreground truncate max-w-[80px] text-right">{m.home_team}</span>
