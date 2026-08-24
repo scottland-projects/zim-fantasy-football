@@ -24,6 +24,10 @@ CREATE TABLE IF NOT EXISTS profiles (
   favorite_player TEXT,
   supporter_branch TEXT,
   bio TEXT,
+  -- Captured at onboarding so day-one navigation/defaults (e.g. which sport
+  -- tab Predictions opens on) reflect what the user actually follows,
+  -- instead of defaulting everyone into a football-first view.
+  interested_sports TEXT[] DEFAULT ARRAY['football']::TEXT[],
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -56,7 +60,7 @@ CREATE POLICY "Users can update own profile"
 -- safe columns.
 REVOKE SELECT ON profiles FROM anon, authenticated;
 GRANT SELECT (id, username, full_name, avatar_url, role, xp, level, fantasy_points,
-  favorite_player, supporter_branch, bio, created_at, updated_at) ON profiles TO anon, authenticated;
+  favorite_player, supporter_branch, bio, interested_sports, created_at, updated_at) ON profiles TO anon, authenticated;
 GRANT SELECT ON profiles TO service_role;
 
 -- =============================================

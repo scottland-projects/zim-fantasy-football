@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { motion } from "framer-motion";
 import { TopBar } from "@/components/layout/TopBar";
 import { Target, Trophy, Check, Info, Medal, Circle, Flame, Users } from "lucide-react";
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useFeatureFlag } from "@/lib/hooks/useFeatureFlag";
 import { FeatureDisabled } from "@/components/ui/FeatureDisabled";
+import { useSearchParams } from "next/navigation";
 
 type Sport = "football" | "cricket" | "rugby";
 
@@ -54,9 +55,21 @@ interface GroupPickRow {
 }
 
 export default function PredictionsPage() {
-  const scorePredictionsEnabled = useFeatureFlag("scorePredictions");
+  return (
+    <Suspense>
+      <PredictionsPageContent />
+    </Suspense>
+  );
+}
 
-  const [sport, setSport] = useState<Sport>("football");
+function PredictionsPageContent() {
+  const scorePredictionsEnabled = useFeatureFlag("scorePredictions");
+  const searchParams = useSearchParams();
+
+  const [sport, setSport] = useState<Sport>(() => {
+    const fromUrl = searchParams.get("sport");
+    return (fromUrl === "cricket" || fromUrl === "rugby" || fromUrl === "football") ? fromUrl : "football";
+  });
   const [season, setSeason] = useState<string | null>(null);
   const [upcoming, setUpcoming] = useState<UpcomingMatch[]>([]);
   const [drafts, setDrafts] = useState<Record<string, { home: string; away: string }>>({});
@@ -88,6 +101,26 @@ export default function PredictionsPage() {
       setGroups((data ?? []).map((m: any) => m.leagues).filter(Boolean));
     }
     loadGroups();
+  }, []);
+
+  // Default to whichever sport this user actually follows (set at
+  // onboarding) instead of always opening on football — a cricket-only
+  // fan shouldn't have to click past football every time. Skipped if the
+  // URL already named a sport (e.g. arriving from the Games hub).
+  useEffect(() => {
+    if (searchParams.get("sport")) return;
+    async function loadDefaultSport() {
+      const supabase = createClient();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = supabase as any;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await sb.from("profiles").select("interested_sports").eq("id", user.id).single();
+      const preferred = data?.interested_sports?.find((s: string) => SPORTS.some(sp => sp.id === s));
+      if (preferred) setSport(preferred as Sport);
+    }
+    loadDefaultSport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const load = useCallback(async (forSport: Sport, forScope: string) => {

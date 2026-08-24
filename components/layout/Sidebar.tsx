@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Users, Trophy, ShoppingCart,
   Radio, MessageSquare, User, Settings, Shield,
-  ChevronRight, LogOut, X, BarChart2, Target,
+  ChevronRight, LogOut, X, BarChart2, Target, Gamepad2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -50,6 +50,7 @@ interface NavItem { href: string; label: string; icon: LucideIcon; live: boolean
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard",    icon: LayoutDashboard, live: false, flag: null },
+  { href: "/games",     label: "Games",         icon: Gamepad2,        live: false, flag: null },
   { href: "/my-team",   label: "My Team",       icon: Users,           live: false, flag: "fantasyTeams" },
   { href: "/market",    label: "Player Market", icon: ShoppingCart,    live: false, flag: "fantasyTeams" },
   { href: "/predictions", label: "Predictions", icon: Target,          live: false, flag: "scorePredictions" },
