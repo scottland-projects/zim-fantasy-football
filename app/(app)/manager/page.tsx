@@ -65,7 +65,7 @@ export default function ManagerPage() {
     async function load() {
       const supabase = createClient();
       const [{ data: m }, { data: p }] = await Promise.all([
-        supabase.from("matches").select("*").order("matchday", { ascending: false }),
+        supabase.from("matches").select("*").eq("sport", "football").order("matchday", { ascending: false }),
         supabase.from("players").select("id, name, position, club, total_points, is_injured").order("position").order("total_points", { ascending: false }),
       ]);
       if (m) {
@@ -163,7 +163,7 @@ export default function ManagerPage() {
       setCalculating(true);
       await sb.rpc("recalculate_matchday_team_points", { p_matchday: scoringMatch.matchday, p_season: scoringMatch.season });
 
-      const { data: fresh } = await supabase.from("matches").select("*").order("matchday", { ascending: false });
+      const { data: fresh } = await supabase.from("matches").select("*").eq("sport", "football").order("matchday", { ascending: false });
       if (fresh) setMatches(fresh as AdminMatch[]);
       setScoringMatch(null);
     } finally { setSavingStats(false); setCalculating(false); }
@@ -190,7 +190,7 @@ export default function ManagerPage() {
       const { data } = await (supabase as any).from("matches").insert({
         home_team: fixtureForm.home, away_team: fixtureForm.away,
         matchday: parseInt(fixtureForm.matchday), kickoff_time: fixtureForm.kickoff,
-        season: fixtureForm.season, status: "scheduled",
+        season: fixtureForm.season, status: "scheduled", sport: "football",
       }).select().single();
       if (data) setMatches(prev => [data as AdminMatch, ...prev].sort((a, b) => b.matchday - a.matchday));
       setAddFixtureOpen(false);

@@ -87,6 +87,7 @@ export default function DashboardPage() {
         const { data: nextMatch } = await sb
           .from("matches")
           .select("matchday, season")
+          .eq("sport", "football")
           .in("status", ["live", "scheduled"])
           .order("kickoff_time", { ascending: true })
           .limit(1)
@@ -123,6 +124,7 @@ export default function DashboardPage() {
         const { data: matches } = await sb
           .from("matches")
           .select("*")
+          .eq("sport", "football")
           .in("status", ["scheduled", "live"])
           .order("kickoff_time", { ascending: true })
           .limit(3);

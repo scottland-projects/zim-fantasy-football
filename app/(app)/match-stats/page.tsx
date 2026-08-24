@@ -48,7 +48,7 @@ export default function MatchStatsPage() {
         const supabase = createClient();
         const [{ data: matchData }, { data: statsData }] = await Promise.all([
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (supabase as any).from("matches").select("*").order("kickoff_time", { ascending: false }),
+          (supabase as any).from("matches").select("*").eq("sport", "football").order("kickoff_time", { ascending: false }),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (supabase as any).from("players").select("id, name, position, goals, assists, clean_sheets, minutes_played, yellow_cards, red_cards, total_points").order("total_points", { ascending: false }),
         ]);

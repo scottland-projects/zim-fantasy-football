@@ -114,7 +114,7 @@ export default function LivePage() {
         const { data: { user } } = await supabase.auth.getUser();
 
         // Live match
-        const { data: match } = await sb.from("matches").select("*").eq("status", "live")
+        const { data: match } = await sb.from("matches").select("*").eq("sport", "football").eq("status", "live")
           .order("kickoff_time", { ascending: false }).limit(1).maybeSingle();
         if (!match) { setLiveMatch(null); return; }
 

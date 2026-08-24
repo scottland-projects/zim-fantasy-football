@@ -150,6 +150,7 @@ export async function saveFixtureAction(form: {
     kickoff_time: form.kickoff,
     season: form.season.trim().slice(0, 20),
     status: "scheduled",
+    sport: "football",
   }).select().single();
 
   if (dbError) return { error: dbError.message, data: null };

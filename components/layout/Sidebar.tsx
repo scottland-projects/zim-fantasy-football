@@ -25,6 +25,7 @@ function useHasLiveMatch() {
         const { data } = await supabase
           .from("matches")
           .select("id")
+          .eq("sport", "football")
           .eq("status", "live")
           .limit(1);
         setIsLive(Array.isArray(data) && data.length > 0);

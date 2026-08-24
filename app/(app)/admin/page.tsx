@@ -95,7 +95,7 @@ export default function AdminPage() {
         }
 
         // Matches
-        const { data: matchesData } = await supabase.from("matches").select("*").order("matchday", { ascending: false });
+        const { data: matchesData } = await supabase.from("matches").select("*").eq("sport", "football").order("matchday", { ascending: false });
         if (matchesData && matchesData.length > 0) setDbMatches(matchesData as AdminMatch[]);
 
         // Public leagues for prize management
@@ -130,7 +130,7 @@ export default function AdminPage() {
         // Real platform stats
         const [{ count: leagueCount }, { count: liveCount }, { count: notifCount }] = await Promise.all([
           supabase.from("leagues").select("*", { count: "exact", head: true }),
-          supabase.from("matches").select("*", { count: "exact", head: true }).eq("status", "live"),
+          supabase.from("matches").select("*", { count: "exact", head: true }).eq("sport", "football").eq("status", "live"),
           supabase.from("notifications").select("*", { count: "exact", head: true }),
         ]);
         setPlatformStats({ leagues: leagueCount ?? 0, liveMatches: liveCount ?? 0, notifications: notifCount ?? 0 });
@@ -140,7 +140,7 @@ export default function AdminPage() {
           supabase.from("fantasy_teams").select("*", { count: "exact", head: true }),
           supabase.from("fantasy_team_players").select("*", { count: "exact", head: true }),
           supabase.from("chat_messages").select("*", { count: "exact", head: true }),
-          supabase.from("matches").select("*", { count: "exact", head: true }).eq("status", "finished"),
+          supabase.from("matches").select("*", { count: "exact", head: true }).eq("sport", "football").eq("status", "finished"),
         ]);
         setHealthStats({ teams: teamsCount ?? 0, playersPicked: pickedCount ?? 0, messages: msgCount ?? 0, finishedMatches: finishedCount ?? 0 });
 
@@ -148,6 +148,7 @@ export default function AdminPage() {
         const { data: results } = await supabase
           .from("matches")
           .select("home_team, away_team, home_score, away_score, matchday, kickoff_time")
+          .eq("sport", "football")
           .eq("status", "finished")
           .order("kickoff_time", { ascending: false })
           .limit(4);
@@ -322,7 +323,7 @@ export default function AdminPage() {
       );
       setCalculating(true);
       const supabase = createClient();
-      const { data: fresh } = await supabase.from("matches").select("*").order("matchday", { ascending: false });
+      const { data: fresh } = await supabase.from("matches").select("*").eq("sport", "football").order("matchday", { ascending: false });
       if (fresh) setDbMatches(fresh as AdminMatch[]);
       setScoringMatch(null);
       showToast("success", "Stats saved and points calculated");

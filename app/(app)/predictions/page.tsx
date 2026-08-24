@@ -58,6 +58,7 @@ export default function PredictionsPage() {
     const { data: matches } = await sb
       .from("matches")
       .select("id, home_team, away_team, kickoff_time, matchday")
+      .eq("sport", "football")
       .eq("status", "scheduled")
       .order("kickoff_time", { ascending: true })
       .limit(20);

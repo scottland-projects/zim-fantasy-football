@@ -64,12 +64,14 @@ GRANT SELECT ON profiles TO service_role;
 -- =============================================
 CREATE TABLE IF NOT EXISTS teams (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  name TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
   short_name TEXT NOT NULL,
   city TEXT,
   primary_color TEXT DEFAULT '#15803D',
   crest_url TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  sport TEXT NOT NULL DEFAULT 'football' CHECK (sport IN ('football', 'cricket', 'rugby')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(name, sport)
 );
 
 ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
@@ -249,6 +251,7 @@ CREATE TABLE IF NOT EXISTS matches (
   status TEXT DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'live', 'finished', 'postponed')),
   matchday INTEGER DEFAULT 1,
   season TEXT DEFAULT '2026',
+  sport TEXT NOT NULL DEFAULT 'football' CHECK (sport IN ('football', 'cricket', 'rugby')),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
