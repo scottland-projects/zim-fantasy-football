@@ -422,7 +422,82 @@ END;
 $$;
 
 
--- ─── 9. Least-privilege grants ────────────────────────────────────────────
+-- ─── 9. Prediction reminders — closing-soon notifications ───────────────────
+--
+-- Scheduled via pg_cron (see the bottom of this file) to run every 15
+-- minutes. No auth.uid() check — pg_cron invokes this outside any user
+-- session, so it can't be admin/manager-gated the normal way. It's not
+-- exposed to PostgREST either (REVOKE'd from every client-facing role
+-- below), so the only way to trigger it is the cron schedule itself.
+
+CREATE OR REPLACE FUNCTION send_prediction_reminders()
+RETURNS VOID
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  m RECORD;
+BEGIN
+  FOR m IN
+    SELECT id, home_team, away_team, sport, kickoff_time
+    FROM matches
+    WHERE status = 'scheduled'
+      AND reminder_sent_at IS NULL
+      AND kickoff_time BETWEEN NOW() AND NOW() + INTERVAL '60 minutes'
+  LOOP
+    INSERT INTO notifications (user_id, title, body, type)
+    SELECT
+      p.id,
+      'Predictions closing soon ⏰',
+      m.home_team || ' vs ' || m.away_team || ' kicks off within the hour — get your ' || m.sport || ' prediction in before it locks.',
+      'prediction'
+    FROM profiles p
+    WHERE NOT EXISTS (
+      SELECT 1 FROM score_predictions sp WHERE sp.match_id = m.id AND sp.user_id = p.id
+    );
+
+    UPDATE matches SET reminder_sent_at = NOW() WHERE id = m.id;
+  END LOOP;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION send_prediction_reminders FROM PUBLIC, anon, authenticated;
+
+
+-- ─── 10. Prediction streak — consecutive correct predictions for one sport ──
+--
+-- Computed on demand rather than stored, so it self-heals no matter what
+-- order matches get finished in (an admin correcting an older match after a
+-- newer one has already been scored wouldn't desync a stored counter).
+-- "Correct" here means any nonzero prediction score (at least got the
+-- winner/draw right), not just an exact scoreline.
+
+CREATE OR REPLACE FUNCTION get_prediction_streak(p_user_id UUID, p_sport TEXT)
+RETURNS INTEGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  rec RECORD;
+  v_streak INTEGER := 0;
+BEGIN
+  FOR rec IN
+    SELECT sp.points_earned
+    FROM score_predictions sp
+    JOIN matches m ON m.id = sp.match_id
+    WHERE sp.user_id = p_user_id AND m.sport = p_sport AND sp.points_earned IS NOT NULL
+    ORDER BY m.kickoff_time DESC
+  LOOP
+    EXIT WHEN rec.points_earned = 0;
+    v_streak := v_streak + 1;
+  END LOOP;
+  RETURN v_streak;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION get_prediction_streak TO authenticated;
+REVOKE EXECUTE ON FUNCTION get_prediction_streak FROM PUBLIC, anon;
+
+
+-- ─── 11. Least-privilege grants ────────────────────────────────────────────
 
 GRANT EXECUTE ON FUNCTION calculate_player_match_points TO authenticated;
 GRANT EXECUTE ON FUNCTION recalculate_matchday_team_points TO authenticated;
@@ -436,3 +511,19 @@ REVOKE EXECUTE ON FUNCTION recalculate_single_team_points FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION reverse_matchday_team_points FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION score_predictions_for_match FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION reverse_predictions_for_match FROM PUBLIC, anon;
+
+
+-- ─── 12. Schedule the prediction-reminder job ────────────────────────────
+--
+-- Requires the pg_cron extension (Supabase supports this on all paid plans
+-- and most free-tier projects — enable it under Database → Extensions if
+-- the CREATE EXTENSION line below errors). Re-running this block is safe:
+-- cron.schedule() on an existing job name updates it in place.
+
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+SELECT cron.schedule(
+  'prediction-reminders',
+  '*/15 * * * *',
+  $$SELECT send_prediction_reminders();$$
+);

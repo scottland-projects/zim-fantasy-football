@@ -252,6 +252,10 @@ CREATE TABLE IF NOT EXISTS matches (
   matchday INTEGER DEFAULT 1,
   season TEXT DEFAULT '2026',
   sport TEXT NOT NULL DEFAULT 'football' CHECK (sport IN ('football', 'cricket', 'rugby')),
+  -- Set once send_prediction_reminders() has notified users this match's
+  -- predictions are closing soon, so the scheduled job doesn't re-notify
+  -- everyone every time it runs.
+  reminder_sent_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -336,7 +340,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
   title TEXT NOT NULL,
   body TEXT NOT NULL,
-  type TEXT DEFAULT 'system' CHECK (type IN ('match', 'transfer', 'goal', 'league', 'reward', 'system')),
+  type TEXT DEFAULT 'system' CHECK (type IN ('match', 'transfer', 'goal', 'league', 'reward', 'system', 'prediction')),
   read BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -367,6 +371,37 @@ ALTER TABLE achievements ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Achievements viewable by everyone" ON achievements FOR SELECT USING (true);
 
+-- Small, no-role-check XP grant for a user's own routine actions (voting on
+-- a poll, creating one, a correct prediction). Deliberately separate from
+-- grant_xp() in achievements.sql, which stays admin/manager-only on
+-- purpose (see its comment) — this one is for the caller's OWN account
+-- only and is never exposed directly to PostgREST, so it can't be used to
+-- self-boost by naming an arbitrary target user or an arbitrary amount.
+CREATE OR REPLACE FUNCTION _grant_xp_unchecked(p_user_id UUID, p_xp INTEGER)
+RETURNS VOID LANGUAGE plpgsql AS $$
+DECLARE
+  v_xp    INTEGER;
+  v_level INTEGER;
+  v_threshold INTEGER;
+BEGIN
+  SELECT xp, level INTO v_xp, v_level FROM profiles WHERE id = p_user_id;
+  v_xp    := COALESCE(v_xp, 0) + GREATEST(p_xp, 0);
+  v_level := COALESCE(v_level, 1);
+
+  LOOP
+    v_threshold := v_level * 1000;
+    EXIT WHEN v_xp < v_threshold OR v_level >= 10;
+    v_xp    := v_xp - v_threshold;
+    v_level := v_level + 1;
+    INSERT INTO notifications (user_id, title, body, type)
+    VALUES (p_user_id, 'Level Up! ' || v_level || ' 🎉', 'You reached Level ' || v_level || '!', 'reward');
+  END LOOP;
+
+  UPDATE profiles SET xp = v_xp, level = v_level WHERE id = p_user_id;
+END;
+$$;
+REVOKE EXECUTE ON FUNCTION _grant_xp_unchecked(UUID, INTEGER) FROM PUBLIC, anon, authenticated;
+
 -- =============================================
 -- POLLS TABLE
 -- =============================================
@@ -376,14 +411,32 @@ CREATE TABLE IF NOT EXISTS polls (
   options JSONB NOT NULL DEFAULT '[]',
   votes JSONB NOT NULL DEFAULT '{}',
   match_id UUID REFERENCES matches(id) ON DELETE SET NULL,
+  -- NULL = a global/admin poll (visible to everyone, as before). Non-null =
+  -- a poll created by a group member, scoped to that league/group only.
+  league_id UUID REFERENCES leagues(id) ON DELETE CASCADE,
+  created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
   expires_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 ALTER TABLE polls ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Polls viewable by everyone" ON polls FOR SELECT USING (true);
+-- Global polls (league_id NULL) stay visible to everyone, same as before.
+-- Group polls are only visible to that group's members — a private friend
+-- group's poll shouldn't leak to the whole platform.
+CREATE POLICY "Polls viewable by everyone or group members" ON polls FOR SELECT USING (
+  league_id IS NULL OR is_league_member(league_id)
+);
 CREATE POLICY "Admins manage polls" ON polls FOR ALL USING (
   EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+);
+-- Group polls are created through create_group_poll() below (not a direct
+-- INSERT), but the poll's OWN creator and the group's owner can delete a
+-- group poll directly — basic moderation without needing an admin.
+CREATE POLICY "Creator or group owner deletes group poll" ON polls FOR DELETE USING (
+  league_id IS NOT NULL AND (
+    created_by = auth.uid()
+    OR EXISTS (SELECT 1 FROM leagues WHERE id = league_id AND owner_id = auth.uid())
+  )
 );
 
 -- One-vote-per-user ledger — votes are only ever recorded through
@@ -431,11 +484,75 @@ BEGIN
   WHERE id = p_poll_id
   RETURNING votes INTO v_votes;
 
+  -- Small XP nudge for voting — ties polls into the same points/XP economy
+  -- as everything else instead of being disconnected from it. Inlined
+  -- rather than calling grant_xp() because that function is deliberately
+  -- restricted to admin/manager callers (see its own comment) — a regular
+  -- user voting on their own poll can't go through it.
+  PERFORM _grant_xp_unchecked(v_user, 5);
+
   RETURN jsonb_build_object('ok', true, 'votes', v_votes, 'choice', p_option);
 END;
 $$;
 
 GRANT EXECUTE ON FUNCTION cast_poll_vote(UUID, TEXT) TO authenticated;
+
+-- Group members create their own polls — the platform doesn't need to be
+-- the only source of polls, a friend group can run its own. Deliberately
+-- an RPC (not a raw INSERT policy) so spam limits and validation live in
+-- one enforced place rather than trusting the client.
+CREATE OR REPLACE FUNCTION create_group_poll(p_league_id UUID, p_question TEXT, p_options TEXT[])
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_user      UUID := auth.uid();
+  v_question  TEXT;
+  v_options   JSONB;
+  v_open_count INTEGER;
+  v_poll_id   UUID;
+BEGIN
+  IF v_user IS NULL THEN RETURN jsonb_build_object('ok', false, 'error', 'not authenticated'); END IF;
+
+  IF (SELECT (value->>'polls')::boolean FROM app_config WHERE key = 'feature_flags') IS FALSE THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'polls are currently disabled');
+  END IF;
+
+  IF NOT is_league_member(p_league_id) THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'not a member of this group');
+  END IF;
+
+  v_question := trim(p_question);
+  IF v_question = '' OR length(v_question) > 200 THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'question must be 1-200 characters');
+  END IF;
+
+  IF array_length(p_options, 1) IS NULL OR array_length(p_options, 1) < 2 OR array_length(p_options, 1) > 6 THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'polls need between 2 and 6 options');
+  END IF;
+  IF EXISTS (SELECT 1 FROM unnest(p_options) o WHERE trim(o) = '' OR length(o) > 60) THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'each option must be 1-60 characters');
+  END IF;
+
+  -- Cap open (unexpired) polls per group so one member can't spam the feed.
+  SELECT count(*) INTO v_open_count FROM polls
+  WHERE league_id = p_league_id AND (expires_at IS NULL OR expires_at > NOW());
+  IF v_open_count >= 5 THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'this group already has 5 open polls — wait for one to expire');
+  END IF;
+
+  SELECT jsonb_agg(trim(o)) INTO v_options FROM unnest(p_options) o;
+
+  INSERT INTO polls (question, options, league_id, created_by, expires_at)
+  VALUES (v_question, v_options, p_league_id, v_user, NOW() + INTERVAL '3 days')
+  RETURNING id INTO v_poll_id;
+
+  PERFORM _grant_xp_unchecked(v_user, 10);
+
+  RETURN jsonb_build_object('ok', true, 'poll_id', v_poll_id);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION create_group_poll(UUID, TEXT, TEXT[]) TO authenticated;
+REVOKE EXECUTE ON FUNCTION create_group_poll(UUID, TEXT, TEXT[]) FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION cast_poll_vote(UUID, TEXT) FROM PUBLIC, anon;
 
 -- =============================================
