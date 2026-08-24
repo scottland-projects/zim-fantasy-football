@@ -7,6 +7,8 @@ import { TopBar } from "@/components/layout/TopBar";
 import { Radio, Trophy, Edit, Plus, Zap, X, Clock, CheckCircle, XCircle } from "lucide-react";
 import { cn, getPositionColor } from "@/lib/utils";
 import { cancelMatchLiveAction, logMatchEventAction, deleteMatchEventAction, reopenMatchAction } from "@/lib/actions/admin";
+import { useFeatureFlag } from "@/lib/hooks/useFeatureFlag";
+import { FeatureDisabled } from "@/components/ui/FeatureDisabled";
 
 interface AdminMatch {
   id: string;
@@ -35,6 +37,16 @@ interface PlayerStatRow {
 }
 
 export default function ManagerPage() {
+  // Managers sit below admin in the role hierarchy, but this whole page —
+  // fixtures, live scoring, player stats, injury flags — only exists to
+  // operate the football fantasy engine. If an admin has switched Fantasy
+  // Teams off (the same flag app/(app)/my-team/page.tsx checks), a manager
+  // shouldn't still have full access to the tooling behind it.
+  const fantasyTeamsEnabled = useFeatureFlag("fantasyTeams");
+  // Live scoring is a separate, more granular flag — an admin might pause
+  // just the live matchday stream without pausing fixture/stats management,
+  // so this only gates the "go live" action, not the whole page.
+  const liveScoringEnabled = useFeatureFlag("liveScoring");
   const [activeTab, setActiveTab] = useState<"matches" | "players">("matches");
 
   // ── Matches ──────────────────────────────────────────────────────────────
@@ -272,6 +284,10 @@ export default function ManagerPage() {
     } finally { setTogglingInjury(null); }
   }
 
+  if (!fantasyTeamsEnabled) {
+    return <FeatureDisabled title="Manager Panel" message="Fantasy Teams is temporarily paused, so match scoring and player management are unavailable too." />;
+  }
+
   return (
     <div className="min-h-screen">
       <TopBar title="Manager Panel" subtitle="Match scoring and player management" />
@@ -372,7 +388,8 @@ export default function ManagerPage() {
                       {/* Action */}
                       <div className="shrink-0">
                         {m.status === "scheduled" && (
-                          <button onClick={() => updateMatchStatus(m.id, "live")} disabled={statusUpdating === m.id}
+                          <button onClick={() => updateMatchStatus(m.id, "live")} disabled={statusUpdating === m.id || !liveScoringEnabled}
+                            title={liveScoringEnabled ? undefined : "Live Scoring is disabled in Feature Flags"}
                             className="text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 hover:bg-red-500/20 transition-colors disabled:opacity-50 whitespace-nowrap">
                             {statusUpdating === m.id ? "…" : "▶ Live"}
                           </button>
