@@ -26,6 +26,7 @@ const ACTIVITY_CONFIG: Record<string, { icon: LucideIcon; bg: string; color: str
 
 export default function DashboardPage() {
   const fantasyTeamsEnabled = useFeatureFlag("fantasyTeams");
+  const chatEnabled = useFeatureFlag("chat");
   const [search, setSearch] = useState("");
   const [predictionPoints, setPredictionPoints] = useState(0);
   const [groupsJoined, setGroupsJoined]         = useState(0);
@@ -461,7 +462,9 @@ export default function DashboardPage() {
                     { href: "/market",  icon: TrendingUp, label: "Player Market",  color: "text-blue-500" },
                   ] : []),
                   { href: "/leagues",   icon: Trophy,  label: "My Groups",      color: "text-yellow-600" },
-                  { href: "/chat",      icon: Flame,   label: "Matchday Chat",  color: "text-orange-500" },
+                  ...(chatEnabled ? [
+                    { href: "/chat",    icon: Flame,   label: "Matchday Chat",  color: "text-orange-500" },
+                  ] : []),
                 ].map((action) => (
                   <Link key={action.href} href={action.href}
                     className="flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 hover:border-zff-green/20 hover:bg-slate-50 transition-all group">
