@@ -502,11 +502,22 @@ ALTER PUBLICATION supabase_realtime ADD TABLE fantasy_teams;
 -- SEED DATA — the 18 real 2026 Castle Lager PSL clubs, identified by their
 -- common fan nicknames (or short name where no widely-used nickname exists)
 -- rather than full registered club names. Players carry NO real names —
--- every player is seeded as "{club code} #{squad number}" only. Squad
--- numbers below follow ordinary football numbering conventions (1 = GK,
--- etc.) but are illustrative, not scraped from any official/verified squad
--- list — no claim is made that a given number belongs to a specific real
--- individual. See LEGAL.md before broadening this to real player names.
+-- every player is seeded as "#{squad number}" only, position and club only.
+--
+-- 13 of the 18 clubs below use REAL current squad jersey numbers, researched
+-- 2026-08-24 from Transfermarkt/FM26 community squad data and cross-checked
+-- against current Castle Lager PSL standings — no player names were kept,
+-- only number + broad position (GK/DEF/MID/FWD). Coverage is uneven because
+-- Zimbabwean PSL squads are poorly digitized online: some clubs (Scottland,
+-- ZPC Kariba, WiFi Boys, Sugar Sugar Boyz) have 20+ verified numbers, others
+-- (Gamecocks, Amakhosi) have only 1. Treat this as a best-effort real subset,
+-- not a claim of squad completeness.
+--
+-- The remaining 5 clubs (Golden Boys, Vabvamburi, Ngezi Platinum, The
+-- Punters, Agama) had NO publicly findable jersey-number data at all — these
+-- keep the original illustrative 14-slot template (2 GK, 4 DEF, 4 MID, 4
+-- FWD, ordinary football numbering conventions) and are NOT real squad
+-- numbers. See LEGAL.md before broadening any of this to real player names.
 -- =============================================
 
 INSERT INTO teams (name, short_name, city, primary_color) VALUES
@@ -532,10 +543,31 @@ ON CONFLICT DO NOTHING;
 
 DO $$
 DECLARE
-  v_clubs TEXT[] := ARRAY['Scottland','Golden Boys','DeMbare','Vabvamburi','Ngezi Platinum','Makepekepe','Bosso','The Punters','Simba Bhora','Gamecocks','FC Platinum','Amakhosi','ZPC Kariba','Hunters','Agama','WiFi Boys','Gem Boys','Sugar Sugar Boyz'];
-  -- position + squad number per slot, 14 players per club (2 GK, 4 DEF, 4 MID, 4 FWD)
+  -- Real verified squad numbers per club, 'ClubName|POS:NUM,POS:NUM,...'.
+  -- Researched 2026-08-24 (see header comment above for sourcing/caveats).
+  v_real_rosters TEXT[] := ARRAY[
+    'Scottland|GK:1,GK:16,DEF:3,DEF:4,DEF:5,DEF:18,DEF:21,DEF:22,DEF:23,DEF:24,MID:6,MID:13,MID:14,MID:15,MID:25,MID:44,MID:55,MID:74,FWD:7,FWD:8,FWD:9,FWD:10,FWD:11,FWD:12,FWD:17,FWD:19,FWD:20,FWD:26,FWD:28,FWD:30,FWD:77,FWD:80',
+    'DeMbare|DEF:5,DEF:21,MID:11,MID:15,FWD:10,FWD:20',
+    'Makepekepe|GK:1,GK:6,GK:30,DEF:12,MID:8,MID:10,MID:13,MID:17,MID:19,MID:36,MID:44,MID:45,MID:89,FWD:3,FWD:9,FWD:24',
+    'Bosso|GK:1,DEF:4,MID:7,MID:19,FWD:11,FWD:22',
+    'Simba Bhora|GK:31,GK:80,DEF:3,DEF:22,MID:6,FWD:17',
+    'Gamecocks|FWD:27',
+    'FC Platinum|DEF:19,DEF:21,DEF:29,MID:9,MID:11,MID:25,MID:77,FWD:27,FWD:28',
+    'Amakhosi|MID:10',
+    'ZPC Kariba|GK:26,GK:39,GK:66,DEF:6,DEF:10,DEF:17,DEF:28,DEF:37,DEF:49,MID:5,MID:8,MID:12,MID:13,MID:15,MID:19,MID:22,MID:23,MID:24,MID:45,MID:90,FWD:7,FWD:11,FWD:14,FWD:99',
+    'Hunters|DEF:3,MID:4,MID:42,FWD:9',
+    'WiFi Boys|GK:1,GK:43,DEF:3,DEF:4,DEF:6,DEF:12,DEF:19,DEF:21,DEF:23,DEF:31,MID:2,MID:7,MID:11,MID:14,MID:17,MID:18,MID:77,MID:80,FWD:9,FWD:13,FWD:15,FWD:16,FWD:22,FWD:24,FWD:47,FWD:70',
+    'Gem Boys|GK:13,GK:16',
+    'Sugar Sugar Boyz|GK:16,GK:25,GK:31,DEF:2,DEF:4,DEF:7,DEF:12,DEF:14,DEF:15,DEF:26,DEF:32,MID:5,MID:6,MID:13,MID:17,MID:18,MID:19,MID:20,MID:23,MID:27,MID:28,MID:29,MID:30,FWD:1,FWD:8,FWD:9,FWD:10,FWD:11,FWD:22'
+  ];
+  -- Clubs with no publicly verifiable real squad data — kept on the
+  -- original illustrative 14-slot template (2 GK, 4 DEF, 4 MID, 4 FWD).
+  v_placeholder_clubs TEXT[] := ARRAY['Golden Boys','Vabvamburi','Ngezi Platinum','The Punters','Agama'];
   v_slots TEXT[] := ARRAY['GK:1','GK:22','DEF:2','DEF:3','DEF:4','DEF:5','MID:6','MID:7','MID:8','MID:10','FWD:9','FWD:11','FWD:14','FWD:17'];
+  v_roster TEXT;
   v_club TEXT;
+  v_pairs TEXT[];
+  v_pair TEXT;
   v_slot TEXT;
   v_pos TEXT;
   v_num INT;
@@ -547,7 +579,49 @@ DECLARE
   v_form NUMERIC;
 BEGIN
   PERFORM setseed(0.73);
-  FOREACH v_club IN ARRAY v_clubs LOOP
+
+  FOREACH v_roster IN ARRAY v_real_rosters LOOP
+    v_club := split_part(v_roster, '|', 1);
+    v_pairs := string_to_array(split_part(v_roster, '|', 2), ',');
+    FOREACH v_pair IN ARRAY v_pairs LOOP
+      v_pos := split_part(v_pair, ':', 1);
+      v_num := split_part(v_pair, ':', 2)::INT;
+
+      CASE v_pos
+        WHEN 'GK' THEN
+          v_price   := 4200000 + floor(random() * 1600000)::INT;
+          v_points  := 55 + floor(random() * 40)::INT;
+          v_goals   := 0;
+          v_assists := floor(random() * 2)::INT;
+          v_cs      := 3 + floor(random() * 6)::INT;
+        WHEN 'DEF' THEN
+          v_price   := 4400000 + floor(random() * 1800000)::INT;
+          v_points  := 55 + floor(random() * 35)::INT;
+          v_goals   := floor(random() * 3)::INT;
+          v_assists := floor(random() * 4)::INT;
+          v_cs      := 2 + floor(random() * 6)::INT;
+        WHEN 'MID' THEN
+          v_price   := 5500000 + floor(random() * 3000000)::INT;
+          v_points  := 70 + floor(random() * 55)::INT;
+          v_goals   := 1 + floor(random() * 6)::INT;
+          v_assists := 2 + floor(random() * 9)::INT;
+          v_cs      := floor(random() * 2)::INT;
+        ELSE -- FWD
+          v_price   := 6000000 + floor(random() * 5500000)::INT;
+          v_points  := 75 + floor(random() * 95)::INT;
+          v_goals   := 3 + floor(random() * 16)::INT;
+          v_assists := 2 + floor(random() * 7)::INT;
+          v_cs      := 0;
+      END CASE;
+
+      v_form := round((5.5 + random() * 4.3)::NUMERIC, 1);
+
+      INSERT INTO players (name, position, club, price, total_points, goals, assists, clean_sheets, form)
+      VALUES ('#' || v_num, v_pos, v_club, v_price, v_points, v_goals, v_assists, v_cs, v_form);
+    END LOOP;
+  END LOOP;
+
+  FOREACH v_club IN ARRAY v_placeholder_clubs LOOP
     FOREACH v_slot IN ARRAY v_slots LOOP
       v_pos := split_part(v_slot, ':', 1);
       v_num := split_part(v_slot, ':', 2)::INT;
