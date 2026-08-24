@@ -62,23 +62,17 @@ export async function joinLeague(inviteCode: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
 
-  // Use service role for the lookup — RLS would block regular users from
-  // seeing private leagues, even with a valid invite code.
-  const { data: league } = await serviceRole()
-    .from("leagues")
-    .select()
-    .eq("invite_code", inviteCode.toUpperCase())
-    .single();
+  // join_private_league validates the invite code and inserts the
+  // membership row in one SECURITY DEFINER step — the RLS policy on
+  // league_members no longer allows a direct client insert for a private
+  // league at all (previously it only checked auth.uid() = user_id, with
+  // no idea whether the league was actually private or a code was ever
+  // presented — a raw insert here would now just fail RLS).
+  const { data, error } = await supabase.rpc("join_private_league", { p_invite_code: inviteCode });
+  if (error || data?.error) return { error: "Unable to join league. Please check the invite code." };
 
-  if (!league) return { error: "Unable to join league. Please check the invite code." };
-
-  const { error } = await supabase
-    .from("league_members")
-    .insert({ league_id: league.id, user_id: user.id });
-
-  if (error) return { error: "Unable to join league. Please check the invite code." };
   revalidatePath("/leagues");
-  return { success: true, league };
+  return { success: true, league: { id: data.league_id, name: data.league_name, type: data.league_type } };
 }
 
 export async function getPublicLeagues() {

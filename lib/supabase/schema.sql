@@ -66,6 +66,22 @@ GRANT SELECT (id, username, full_name, avatar_url, role, xp, level, fantasy_poin
   favorite_player, supporter_branch, bio, interested_sports, created_at, updated_at) ON profiles TO anon, authenticated;
 GRANT SELECT ON profiles TO service_role;
 
+-- The RLS policies above gate WHICH ROW (your own), not which COLUMNS of
+-- it — Supabase's default table-level INSERT/UPDATE grants to
+-- `authenticated` covered every column, including role, xp, level, and
+-- fantasy_points. Confirmed live: any authenticated user could
+-- PATCH .../profiles?id=eq.<their own id> with {"role":"admin"} and
+-- instantly become admin, completely bypassing every server-action role
+-- check in the app (all of which just re-read this same column). Same
+-- REVOKE-then-narrow-GRANT pattern as the SELECT fix above. INSERT is
+-- revoked entirely rather than narrowed — no client code anywhere inserts
+-- into profiles directly; account creation is exclusively the
+-- on_auth_user_created trigger, which is SECURITY DEFINER and doesn't need
+-- this grant regardless.
+REVOKE INSERT, UPDATE ON profiles FROM authenticated;
+GRANT UPDATE (full_name, avatar_url, favorite_player, supporter_branch, bio, interested_sports)
+  ON profiles TO authenticated;
+
 -- =============================================
 -- TEAMS TABLE — canonical list of real Zimbabwean clubs
 -- =============================================
@@ -142,6 +158,25 @@ ALTER TABLE fantasy_teams ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Fantasy teams viewable by everyone" ON fantasy_teams FOR SELECT USING (true);
 CREATE POLICY "Users manage own team" ON fantasy_teams FOR ALL USING (auth.uid() = user_id);
 
+-- The USING clause above legitimately lets a user touch their own row —
+-- the table-level grant is what needs narrowing, or "their own row"
+-- includes budget_remaining/total_points/weekly_points, which should only
+-- ever move through save_fantasy_team/buy_player/sell_player/
+-- recalculate_*_team_points (all SECURITY DEFINER, none of which need this
+-- grant). Confirmed live: a direct PATCH to /fantasy_teams could set
+-- budget_remaining to anything before this fix. The one legitimate direct-
+-- client write left in the app is the Market page's upsert-a-team-on-
+-- first-visit (user_id, team_name, formation only).
+REVOKE INSERT, UPDATE ON fantasy_teams FROM authenticated;
+GRANT INSERT (user_id, team_name, formation) ON fantasy_teams TO authenticated;
+-- user_id is included here too, not just team_name/formation — the
+-- Market page's upsert (ON CONFLICT (user_id) DO UPDATE) puts every column
+-- from its payload into the generated UPDATE's SET list, user_id included,
+-- even though its value never actually changes. RLS's WITH CHECK (implicit
+-- auth.uid() = user_id, same as USING) still blocks pointing the row at
+-- anyone else regardless of this grant.
+GRANT UPDATE (user_id, team_name, formation) ON fantasy_teams TO authenticated;
+
 -- =============================================
 -- FANTASY TEAM PLAYERS TABLE
 -- =============================================
@@ -163,6 +198,14 @@ CREATE POLICY "Team players viewable by everyone" ON fantasy_team_players FOR SE
 CREATE POLICY "Users manage own team players" ON fantasy_team_players FOR ALL USING (
   EXISTS (SELECT 1 FROM fantasy_teams WHERE id = fantasy_team_id AND user_id = auth.uid())
 );
+
+-- No client code anywhere in the app writes to this table directly — squad
+-- changes only ever go through save_fantasy_team/buy_player/sell_player
+-- (all SECURITY DEFINER). Revoked entirely rather than narrowed:
+-- confirmed live that before this, a user could INSERT arbitrary
+-- (free, unpaid) players into their own squad, exceed the 15-player cap,
+-- or mark every player is_captain (stacking the 2x scoring multiplier).
+REVOKE INSERT, UPDATE, DELETE ON fantasy_team_players FROM authenticated;
 
 -- =============================================
 -- LEAGUES TABLE
@@ -246,8 +289,58 @@ GRANT EXECUTE ON FUNCTION is_league_member(UUID) TO authenticated;
 CREATE POLICY "League members viewable by members" ON league_members FOR SELECT USING (
   is_league_member(league_id)
 );
-CREATE POLICY "Users join leagues" ON league_members FOR INSERT WITH CHECK (auth.uid() = user_id);
+-- The original version of this policy checked only auth.uid() = user_id —
+-- nothing about the target league at all. Since league ids are UUIDs
+-- leaked via URLs/screenshots rather than secrets, and the app's own
+-- invite-code check lived only in the joinLeague() server action (never
+-- enforced at this layer), any authenticated user could INSERT a
+-- membership row for ANY league — private ones included, no invite code
+-- needed — confirmed live via a direct PostgREST call. Direct insert now
+-- only works for genuinely public leagues; private-league joins go through
+-- join_private_league() below, which validates the invite code itself
+-- (SECURITY DEFINER, so it doesn't need this policy to pass).
+-- Also allows the league's own OWNER to insert their own membership row
+-- directly — createLeague() does exactly this immediately after creating a
+-- brand-new PRIVATE league, so a policy that only allowed public leagues
+-- would leave every new group's creator unable to join their own group.
+CREATE POLICY "Users join public leagues or their own directly" ON league_members FOR INSERT WITH CHECK (
+  auth.uid() = user_id AND (
+    EXISTS (SELECT 1 FROM leagues WHERE id = league_id AND type = 'public')
+    OR EXISTS (SELECT 1 FROM leagues WHERE id = league_id AND owner_id = auth.uid())
+  )
+);
 CREATE POLICY "Users leave leagues" ON league_members FOR DELETE USING (auth.uid() = user_id);
+
+CREATE OR REPLACE FUNCTION join_private_league(p_invite_code TEXT)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_user UUID := auth.uid();
+  v_league RECORD;
+BEGIN
+  IF v_user IS NULL THEN RETURN jsonb_build_object('error', 'not authenticated'); END IF;
+
+  SELECT id, name, type INTO v_league FROM leagues WHERE invite_code = upper(trim(p_invite_code));
+  IF v_league.id IS NULL THEN
+    RETURN jsonb_build_object('error', 'Unable to join league. Please check the invite code.');
+  END IF;
+
+  INSERT INTO league_members (league_id, user_id) VALUES (v_league.id, v_user)
+  ON CONFLICT (league_id, user_id) DO NOTHING;
+
+  RETURN jsonb_build_object('success', true, 'league_id', v_league.id, 'league_name', v_league.name, 'league_type', v_league.type);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION join_private_league(TEXT) TO authenticated;
+REVOKE EXECUTE ON FUNCTION join_private_league(TEXT) FROM PUBLIC, anon;
+
+-- points/weekly_points/rank should never be client-settable — only
+-- recalculate_matchday_team_points writes them, and it's SECURITY DEFINER
+-- (see scoring.sql), so it doesn't need this grant either. Confirmed live:
+-- before this, any member could PATCH their own league_members row and
+-- set points/rank to anything, corrupting a group's leaderboard directly.
+REVOKE INSERT, UPDATE ON league_members FROM authenticated;
+GRANT INSERT (league_id, user_id) ON league_members TO authenticated;
 
 -- =============================================
 -- MATCHES TABLE — fixtures between any two clubs
@@ -390,6 +483,13 @@ CREATE POLICY "Users update own notifications" ON notifications FOR UPDATE USING
 CREATE POLICY "admin_insert_notifications" ON notifications FOR INSERT WITH CHECK (
   EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
 );
+
+-- `read` (marking a notification as seen) is the only field a user should
+-- ever change on their own notification — title/body/type/user_id were
+-- all directly writable too, letting a user rewrite their own notification
+-- history's content.
+REVOKE UPDATE ON notifications FROM authenticated;
+GRANT UPDATE (read) ON notifications TO authenticated;
 
 -- =============================================
 -- ACHIEVEMENTS TABLE

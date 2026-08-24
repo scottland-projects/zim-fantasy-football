@@ -233,6 +233,15 @@ $$;
 --        late transfer). Call from admin or an API route.                       ─
 --        SELECT recalculate_single_team_points('<team_uuid>', 3, '2026');   ─
 
+-- SECURITY DEFINER: was INVOKER, relying on the calling admin/manager's
+-- own table grants for its internal UPDATEs to fantasy_teams and profiles
+-- — grants that were far broader than they should have been (see the
+-- profiles/fantasy_teams REVOKE comments in schema.sql) and have since
+-- been narrowed. The auth.uid()-based role check below is unaffected by
+-- SECURITY DEFINER (auth.uid() always reflects the real session) and
+-- remains the actual authorization gate — this only changes which role's
+-- grants satisfy the internal writes, matching every other privileged
+-- function in this schema.
 CREATE OR REPLACE FUNCTION recalculate_single_team_points(
   p_team_id  UUID,
   p_matchday INTEGER,
@@ -240,6 +249,7 @@ CREATE OR REPLACE FUNCTION recalculate_single_team_points(
 )
 RETURNS INTEGER
 LANGUAGE plpgsql
+SECURITY DEFINER
 AS $$
 DECLARE
   v_team_pts   INTEGER := 0;

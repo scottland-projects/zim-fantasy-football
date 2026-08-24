@@ -520,16 +520,24 @@ $$;
 
 -- ─── Wire into the scoring engine ────────────────────────────────────────────
 -- Re-create recalculate_matchday_team_points with achievement call at the end.
--- award_all_achievements() runs as the SAME caller (SECURITY INVOKER
--- propagates auth.uid() through the whole chain), so the role check already
--- inside recalculate_matchday_team_points is sufficient here too.
-
+--
+-- SECURITY DEFINER: was INVOKER, relying on the calling admin/manager's own
+-- table grants for its internal UPDATEs to fantasy_teams, profiles, and
+-- league_members — grants that were far broader than they should have
+-- been (see the corresponding REVOKE comments in schema.sql) and have
+-- since been narrowed to close a live privilege-escalation/data-tampering
+-- path. auth.uid() is unaffected by SECURITY DEFINER (it always reflects
+-- the real session, never the function owner), so the role check below
+-- remains the actual authorization gate — this only changes which role's
+-- grants satisfy the internal writes. award_all_achievements() at the end
+-- still sees the real caller's auth.uid() the same way it always did.
 CREATE OR REPLACE FUNCTION recalculate_matchday_team_points(
   p_matchday INTEGER,
   p_season   TEXT DEFAULT '2026'
 )
 RETURNS VOID
 LANGUAGE plpgsql
+SECURITY DEFINER
 AS $$
 DECLARE
   rec RECORD;
