@@ -33,7 +33,15 @@ export default function MarketPage() {
   const toastTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Load players + squad from Supabase ────────────────────────────
+  // Skipped while Fantasy Teams is disabled — see the matching fix on
+  // /my-team. This also used to plain-INSERT a new fantasy_teams row on a
+  // user's first visit without an ON CONFLICT target; fantasy_teams.user_id
+  // is UNIQUE, so two near-simultaneous loads (a double-mount in dev, two
+  // tabs, a fast re-render) both seeing no existing team raced to insert
+  // one each, and the loser got a 409 instead of just finding what the
+  // winner created. Upserting makes it race-safe.
   useEffect(() => {
+    if (!fantasyTeamsEnabled) return;
     async function load() {
       try {
         const supabase = createClient();
@@ -59,10 +67,12 @@ export default function MarketPage() {
           const ids = (team.fantasy_team_players ?? []).map((p: any) => p.player_id as string);
           setInMyTeam(new Set(ids));
         } else {
-          // First visit — create the team record
+          // First visit — create the team record (idempotent: if another
+          // near-simultaneous load already created it, this just returns
+          // that existing row instead of erroring).
           const { data: newTeam } = await sb
             .from("fantasy_teams")
-            .insert({ user_id: authData.user.id, team_name: "My Dream XI", formation: "4-3-3" })
+            .upsert({ user_id: authData.user.id, team_name: "My Dream XI", formation: "4-3-3" }, { onConflict: "user_id", ignoreDuplicates: false })
             .select("id")
             .single();
           if (newTeam) teamIdRef.current = newTeam.id;
@@ -70,7 +80,7 @@ export default function MarketPage() {
       } catch { /* keep mock player list, inMyTeam stays empty */ }
     }
     load();
-  }, []);
+  }, [fantasyTeamsEnabled]);
 
   // ── Buy / Sell ────────────────────────────────────────────────────
   // Budget and squad-size (15 players, $100.0M) are enforced server-side by

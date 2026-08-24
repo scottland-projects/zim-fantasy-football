@@ -41,8 +41,12 @@ export default function MyTeamPage() {
   const [allPlayers, setAllPlayers]     = useState<Player[]>([]);
   const [squadIds, setSquadIds]         = useState<Set<string>>(new Set<string>());
 
-  // Load players + team from Supabase on mount
+  // Load players + team from Supabase on mount. Skipped while Fantasy
+  // Teams is disabled — this page renders FeatureDisabled in that case and
+  // never shows any of this data, but it used to fetch it anyway, firing a
+  // fantasy_teams query that 406'd for any user with no team yet.
   useEffect(() => {
+    if (!fantasyTeamsEnabled) return;
     async function loadData() {
       const supabase = createClient();
 
@@ -91,7 +95,7 @@ export default function MyTeamPage() {
     }
     loadData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fantasyTeamsEnabled]);
 
   // If the user sells a player (squadIds shrinks), drop them from the XI too
   useEffect(() => {

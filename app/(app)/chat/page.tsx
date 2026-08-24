@@ -6,7 +6,7 @@ import { TopBar } from "@/components/layout/TopBar";
 import { Send, Star, Trash2 } from "lucide-react";
 import { cn, timeAgo } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { sendChatMessageAction, deleteChatMessageAction, reactToMessageAction } from "@/lib/actions/chat";
+import { sendChatMessageAction, deleteChatMessageAction, moderateDeleteChatMessageAction, reactToMessageAction } from "@/lib/actions/chat";
 import { useFeatureFlag } from "@/lib/hooks/useFeatureFlag";
 
 interface ChatMsg {
@@ -27,6 +27,7 @@ export default function ChatPage() {
   const [reactingTo, setReactingTo] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const chatEnabled = useFeatureFlag("chat");
+  const [canModerate, setCanModerate] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -36,6 +37,17 @@ export default function ChatPage() {
   useEffect(() => {
     const supabase = createClient();
     let mounted = true;
+
+    async function fetchRole() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: profile } = await (supabase as any).from("profiles").select("role").eq("id", user.id).single();
+        if (mounted && (profile?.role === "admin" || profile?.role === "moderator")) setCanModerate(true);
+      } catch { /* not a moderator, keep default */ }
+    }
+    fetchRole();
 
     async function fetchHistory() {
       try {
@@ -140,6 +152,13 @@ export default function ChatPage() {
     } catch { /* optimistic removal already done */ }
   }
 
+  async function moderateDelete(msgId: string) {
+    const prev = messages;
+    setMessages((cur) => cur.filter((m) => m.id !== msgId));
+    const result = await moderateDeleteChatMessageAction(msgId).catch(() => ({ error: "Failed to remove message" }));
+    if (result?.error) setMessages(prev); // restore on failure — this one isn't optimistic-safe like self-delete
+  }
+
   async function addReaction(msgId: string, emoji: string) {
     setMessages((prev) =>
       prev.map((m) => {
@@ -211,6 +230,15 @@ export default function ChatPage() {
                           onClick={() => deleteMessage(msg.id)}
                           className="absolute -top-2 -left-2 w-5 h-5 bg-red-500 hover:bg-red-600 rounded-full items-center justify-center hidden group-hover/msg:flex transition-colors shadow-sm"
                           title="Delete message"
+                        >
+                          <Trash2 className="w-2.5 h-2.5 text-white" />
+                        </button>
+                      )}
+                      {!msg.isOwn && canModerate && (
+                        <button
+                          onClick={() => moderateDelete(msg.id)}
+                          className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 hover:bg-red-600 rounded-full items-center justify-center hidden group-hover/msg:flex transition-colors shadow-sm"
+                          title="Remove message (moderator)"
                         >
                           <Trash2 className="w-2.5 h-2.5 text-white" />
                         </button>

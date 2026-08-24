@@ -24,18 +24,21 @@ const NOTIF_CONFIG: Record<string, { icon: LucideIcon; bg: string; color: string
   achievement: { icon: Star,    bg: "bg-yellow-50",  color: "text-yellow-500" },
 };
 
-const MOCK_NOTIFS = [
-  { id: "1", title: "MD11 Complete!", body: "Your score: 89 pts — view breakdown.", type: "match", read: false, created_at: new Date(Date.now() - 7200000).toISOString() },
-  { id: "2", title: "Billiat scored!", body: "Khama Billiat: goal + assist. +9 pts added.", type: "goal", read: false, created_at: new Date(Date.now() - 14400000).toISOString() },
-  { id: "3", title: "Transfer Window Open", body: "Make your transfers before Sat 31 May.", type: "transfer", read: true, created_at: new Date(Date.now() - 86400000).toISOString() },
-  { id: "4", title: "Level Up!", body: "You reached Level 5 — Die-Hard Supporter.", type: "reward", read: true, created_at: new Date(Date.now() - 172800000).toISOString() },
-];
+interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  type: string;
+  read: boolean;
+  created_at: string;
+}
 
 export function TopBar({ title, subtitle, rightContent }: TopBarProps) {
   const { toggle } = useSidebar();
   const [notifOpen, setNotifOpen] = useState(false);
-  const [notifs, setNotifs] = useState<typeof MOCK_NOTIFS>([]);
-  const [userPoints, setUserPoints] = useState<number | null>(null);
+  const [notifs, setNotifs] = useState<AppNotification[]>([]);
+  const [userXp, setUserXp] = useState<number | null>(null);
+  const [userLevel, setUserLevel] = useState<number | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const unread = notifs.filter((n) => !n.read).length;
 
@@ -61,11 +64,15 @@ export function TopBar({ title, subtitle, rightContent }: TopBarProps) {
 
         const [{ data: notifData }, { data: profile }] = await Promise.all([
           supabase.from("notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(10),
+          // xp/level, not fantasy_points — this badge shows on every page,
+          // including ones with nothing to do with football fantasy, so it
+          // needs the one stat that's meaningful regardless of sport or
+          // game mode (same measure Dashboard and Groups already use).
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (supabase as any).from("profiles").select("fantasy_points").eq("id", user.id).single(),
+          (supabase as any).from("profiles").select("xp, level").eq("id", user.id).single(),
         ]);
         if (notifData && notifData.length > 0) setNotifs(notifData);
-        if (profile) setUserPoints(profile.fantasy_points ?? 0);
+        if (profile) { setUserXp(profile.xp ?? 0); setUserLevel(profile.level ?? 1); }
       } catch { /* keep defaults */ }
     }
 
@@ -222,7 +229,9 @@ export function TopBar({ title, subtitle, rightContent }: TopBarProps) {
           style={{ backgroundColor: "rgba(21,128,61,0.06)" }}
         >
           <Zap className="w-4 h-4 text-zff-green" />
-          <span className="text-sm font-bold text-zff-green hidden sm:inline">{userPoints !== null ? `${userPoints.toLocaleString()} pts` : "— pts"}</span>
+          <span className="text-sm font-bold text-zff-green hidden sm:inline">
+            {userLevel !== null && userXp !== null ? `Lvl ${userLevel} · ${userXp.toLocaleString()} XP` : "— XP"}
+          </span>
         </div>
       </div>
     </motion.header>

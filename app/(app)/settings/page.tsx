@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { TopBar } from "@/components/layout/TopBar";
-import { Bell, Shield, Palette, Save, Check, AlertTriangle, KeyRound, Eye, EyeOff } from "lucide-react";
+import { Bell, Shield, Palette, Save, Check, AlertTriangle, KeyRound, Eye, EyeOff, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 
@@ -64,6 +64,7 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [saved, setSaved]       = useState(false);
   const [saving, setSaving]     = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [loading, setLoading]   = useState(true);
   const [pwOpen, setPwOpen]               = useState(false);
   const [pwForm, setPwForm]               = useState({ current: "", next: "", confirm: "" });
@@ -71,6 +72,9 @@ export default function SettingsPage() {
   const [pwSaving, setPwSaving]           = useState(false);
   const [pwDone, setPwDone]               = useState(false);
   const [showPw, setShowPw]               = useState({ current: false, next: false, confirm: false });
+  const [sports, setSports]               = useState<string[]>(["football"]);
+  const [sportsSaving, setSportsSaving]   = useState(false);
+  const [sportsSaved, setSportsSaved]     = useState(false);
 
   // Load settings from Supabase on mount
   useEffect(() => {
@@ -93,6 +97,14 @@ export default function SettingsPage() {
             display:       { ...DEFAULT_SETTINGS.display,       ...(data.display ?? {}) },
           });
         }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: profile } = await (supabase as any)
+          .from("profiles")
+          .select("interested_sports")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (profile?.interested_sports?.length > 0) setSports(profile.interested_sports);
       } catch { /* use defaults */ }
       finally { setLoading(false); }
     }
@@ -111,6 +123,29 @@ export default function SettingsPage() {
       ...prev,
       display: { ...prev.display, [key]: value },
     }));
+  }
+
+  // interested_sports was only ever writable once, during onboarding —
+  // this is the only way to change it afterward. Saves immediately on
+  // toggle (like a live preference) rather than requiring the big Save
+  // Settings button below, since it's not part of that JSONB payload.
+  async function toggleFollowedSport(id: string) {
+    const next = sports.includes(id) ? sports.filter(s => s !== id) : [...sports, id];
+    if (next.length === 0) return; // always keep at least one selected
+    setSports(next);
+    setSportsSaving(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any)
+        .from("profiles")
+        .update({ interested_sports: next })
+        .eq("id", user.id);
+      if (!error) { setSportsSaved(true); setTimeout(() => setSportsSaved(false), 2000); }
+    } catch { /* leave the optimistic UI state; user can retoggle if it didn't stick */ }
+    finally { setSportsSaving(false); }
   }
 
   async function changePassword() {
@@ -152,13 +187,14 @@ export default function SettingsPage() {
 
   async function saveSettings() {
     setSaving(true);
+    setSaveError("");
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) { setSaveError("You need to be signed in to save settings."); return; }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any)
+      const { error } = await (supabase as any)
         .from("user_settings")
         .upsert({
           user_id:       user.id,
@@ -167,10 +203,19 @@ export default function SettingsPage() {
           updated_at:    new Date().toISOString(),
         }, { onConflict: "user_id" });
 
+      // The Supabase client returns an error object rather than throwing —
+      // this used to be missed entirely, so a failed save (once, a schema
+      // mismatch meant every save failed) still showed a "✓ Saved" success
+      // state with nothing actually persisted.
+      if (error) { setSaveError("Couldn't save your settings — please try again."); return; }
+
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-    } catch { /* silently fail */ }
-    finally { setSaving(false); }
+    } catch {
+      setSaveError("Couldn't save your settings — please try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (loading) {
@@ -189,6 +234,41 @@ export default function SettingsPage() {
       <TopBar title="Settings" subtitle="Configure your experience" />
 
       <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto space-y-6">
+
+        {/* Sports You Follow */}
+        <div className="glass-card p-7">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="font-bold text-zff-black flex items-center gap-2">
+              <Target className="w-4 h-4 text-zff-green" /> Sports You Follow
+            </h2>
+            {sportsSaved && <span className="text-xs text-zff-green font-medium flex items-center gap-1"><Check className="w-3 h-3" /> Saved</span>}
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">
+            Set at signup — change it any time. This decides your default Predictions tab and what the Games hub highlights for you.
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { id: "football", label: "Football", emoji: "⚽" },
+              { id: "cricket",  label: "Cricket",  emoji: "🏏" },
+              { id: "rugby",    label: "Rugby",    emoji: "🏉" },
+            ].map((s) => (
+              <button
+                key={s.id}
+                onClick={() => toggleFollowedSport(s.id)}
+                disabled={sportsSaving}
+                className={cn(
+                  "flex flex-col items-center gap-1.5 py-4 rounded-xl border text-sm font-medium transition-all disabled:opacity-60",
+                  sports.includes(s.id)
+                    ? "bg-zff-green/10 border-zff-green/40 text-zff-green"
+                    : "border-slate-200 text-muted-foreground hover:border-zff-green/20"
+                )}
+              >
+                <span className="text-xl">{s.emoji}</span>
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Notification Preferences */}
         <div className="glass-card p-7">
@@ -284,17 +364,24 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <button
-          onClick={saveSettings}
-          disabled={saving}
-          className={cn(
-            "btn-primary flex items-center gap-2 py-2.5 px-6 transition-all disabled:opacity-60",
-            saved && "bg-emerald-600 border-emerald-600"
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            onClick={saveSettings}
+            disabled={saving}
+            className={cn(
+              "btn-primary flex items-center gap-2 py-2.5 px-6 transition-all disabled:opacity-60",
+              saved && "bg-emerald-600 border-emerald-600"
+            )}
+          >
+            {saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+            {saving ? "Saving..." : saved ? "Settings Saved!" : "Save Settings"}
+          </button>
+          {saveError && (
+            <p className="text-sm text-red-600 flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {saveError}
+            </p>
           )}
-        >
-          {saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-          {saving ? "Saving..." : saved ? "Settings Saved!" : "Save Settings"}
-        </button>
+        </div>
       </div>
     </div>
   );

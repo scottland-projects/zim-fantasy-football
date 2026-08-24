@@ -41,14 +41,14 @@ export async function phoneSignUpAction(email: string, password: string, usernam
   const { count } = await admin
     .from("signup_attempts")
     .select("id", { count: "exact", head: true })
-    .eq("ip", ip)
+    .eq("ip_address", ip)
     .gte("created_at", since);
 
   if ((count ?? 0) >= SIGNUP_MAX_PER_IP) {
     return { error: "Too many accounts created recently. Please try again later." };
   }
 
-  await admin.from("signup_attempts").insert({ ip });
+  await admin.from("signup_attempts").insert({ ip_address: ip });
 
   const { data, error } = await admin.auth.admin.createUser({
     email,

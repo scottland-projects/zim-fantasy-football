@@ -343,6 +343,33 @@ CREATE POLICY "Chat messages viewable by everyone" ON chat_messages FOR SELECT U
 CREATE POLICY "Authenticated users send messages" ON chat_messages FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users delete own messages" ON chat_messages FOR DELETE USING (auth.uid() = user_id);
 
+-- The DELETE policy above only ever let someone remove their OWN message —
+-- there was no way for anyone to enforce the Terms of Service's ban on
+-- abusive chat content short of asking the poster to delete it themselves.
+-- An RPC (not a second RLS policy) so the role check is unambiguous and in
+-- one place, and moderator's first real, distinct capability — previously
+-- assignable via Admin > Users but granted nothing anywhere.
+CREATE OR REPLACE FUNCTION moderate_delete_chat_message(p_message_id UUID)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_user UUID := auth.uid();
+BEGIN
+  IF v_user IS NULL THEN RETURN jsonb_build_object('error', 'not authenticated'); END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = v_user AND role IN ('admin', 'moderator')) THEN
+    RETURN jsonb_build_object('error', 'not authorized');
+  END IF;
+
+  DELETE FROM chat_messages WHERE id = p_message_id;
+  IF NOT FOUND THEN RETURN jsonb_build_object('error', 'message not found'); END IF;
+
+  RETURN jsonb_build_object('success', true);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION moderate_delete_chat_message(UUID) TO authenticated;
+REVOKE EXECUTE ON FUNCTION moderate_delete_chat_message(UUID) FROM PUBLIC, anon;
+
 -- =============================================
 -- NOTIFICATIONS TABLE
 -- =============================================
@@ -664,16 +691,61 @@ INSERT INTO app_config (key, value) VALUES (
 -- =============================================
 -- USER SETTINGS TABLE
 -- =============================================
+-- notifications/display are JSONB, keyed per-toggle (see Settings page's
+-- DEFAULT_SETTINGS for the exact keys) rather than one column per
+-- preference — the frontend was always built against this richer shape;
+-- an earlier flat-boolean version of this table (email_notifications,
+-- push_notifications, marketing_emails) never matched what the app
+-- actually queried, so every Settings save silently failed.
 CREATE TABLE IF NOT EXISTS user_settings (
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE PRIMARY KEY,
-  email_notifications BOOLEAN DEFAULT TRUE,
-  push_notifications BOOLEAN DEFAULT TRUE,
-  marketing_emails BOOLEAN DEFAULT FALSE,
+  notifications JSONB NOT NULL DEFAULT
+    '{"matchReminders":true,"predictionReminders":true,"transferDeadlines":true,"goalAlerts":true,"groupInvites":true,"rewardUnlocks":true,"weeklyDigest":true}'::jsonb,
+  display JSONB NOT NULL DEFAULT
+    '{"compactMode":false,"showAnimations":true,"showPlayerImages":true,"showFormGuide":true}'::jsonb,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users manage own settings" ON user_settings FOR ALL USING (auth.uid() = user_id);
+
+-- Makes every notification-generating trigger/function respect the
+-- recipient's preferences automatically, rather than requiring each one
+-- (15+ call sites across this file, scoring.sql and achievements.sql) to
+-- remember to check user_settings itself.
+CREATE OR REPLACE FUNCTION filter_notification_by_preference()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+DECLARE
+  v_prefs JSONB;
+  v_key   TEXT;
+BEGIN
+  v_key := CASE NEW.type
+    WHEN 'reward'     THEN 'rewardUnlocks'
+    WHEN 'prediction' THEN 'predictionReminders'
+    WHEN 'match'      THEN 'matchReminders'
+    WHEN 'transfer'   THEN 'transferDeadlines'
+    WHEN 'goal'       THEN 'goalAlerts'
+    WHEN 'league'     THEN 'groupInvites'
+    ELSE NULL -- 'system' and anything unmapped always sends, same as a
+              -- transactional/account-critical message would
+  END;
+
+  IF v_key IS NULL THEN RETURN NEW; END IF;
+
+  SELECT notifications INTO v_prefs FROM user_settings WHERE user_id = NEW.user_id;
+
+  IF v_prefs IS NULL OR NOT (v_prefs ? v_key) OR (v_prefs ->> v_key)::boolean IS TRUE THEN
+    RETURN NEW;
+  END IF;
+
+  RETURN NULL; -- preference explicitly off — suppress the insert
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_filter_notification_preference ON notifications;
+CREATE TRIGGER trg_filter_notification_preference
+  BEFORE INSERT ON notifications
+  FOR EACH ROW EXECUTE FUNCTION filter_notification_by_preference();
 
 -- =============================================
 -- RATE LIMITING TABLES — service-role only, no anon/authenticated policies
@@ -1141,6 +1213,15 @@ DECLARE
   v_order INT := 0;
 BEGIN
   IF v_user IS NULL THEN RETURN jsonb_build_object('error', 'not authenticated'); END IF;
+
+  -- Every sibling RPC (buy_player, sell_player, submit_score_prediction,
+  -- cast_poll_vote, create_group_poll) checks its own feature flag
+  -- server-side; this one didn't, so the "Fantasy Teams" toggle only ever
+  -- hid the My Team page's UI, not this RPC.
+  IF (SELECT (value->>'fantasyTeams')::boolean FROM app_config WHERE key = 'feature_flags') IS FALSE THEN
+    RETURN jsonb_build_object('error', 'Fantasy Teams is currently disabled');
+  END IF;
+
   IF array_length(p_player_ids, 1) IS DISTINCT FROM 15 THEN
     RETURN jsonb_build_object('error', 'Squad must have exactly 15 players');
   END IF;

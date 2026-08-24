@@ -58,3 +58,21 @@ export async function deleteChatMessageAction(msgId: string) {
   if (error) return { error: "Failed to delete message" };
   return { success: true };
 }
+
+// Lets an admin or moderator remove someone ELSE's message — previously the
+// only delete path was self-scoped (above), so there was no way to enforce
+// the Terms of Service's ban on abusive chat content short of asking the
+// poster to remove it themselves. moderate_delete_chat_message is the
+// role-checked RPC; this just wraps it as a server action like every other
+// chat operation here.
+export async function moderateDeleteChatMessageAction(msgId: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase: any = await mkClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const { data, error } = await supabase.rpc("moderate_delete_chat_message", { p_message_id: msgId });
+  if (error) return { error: "Failed to remove message" };
+  if (data?.error) return { error: data.error };
+  return { success: true };
+}

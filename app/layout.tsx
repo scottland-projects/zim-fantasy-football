@@ -3,10 +3,10 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Africa Fantasy",
-  description: "The premier fantasy football platform for football fans across Zimbabwe",
+  description: "The home for football, cricket and rugby predictions and fantasy gaming across Zimbabwe",
   openGraph: {
     title: "Africa Fantasy",
-    description: "The premier fantasy football platform for football fans across Zimbabwe",
+    description: "The home for football, cricket and rugby predictions and fantasy gaming across Zimbabwe",
     // TODO: add a real og-image.png (1200x630) to public/ before launch —
     // intentionally omitted rather than pointing at a placeholder asset.
   },

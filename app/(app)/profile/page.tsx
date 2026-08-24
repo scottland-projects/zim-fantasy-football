@@ -28,6 +28,25 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
 
 const EMPTY_PROFILE = { username: "", full_name: "", avatar_url: null as string | null, xp: 0, level: 1, fantasy_points: 0, favorite_player: "", supporter_branch: "", bio: "" };
 
+// Every badge award_achievements() can grant (see achievements.sql's header
+// comment) — used to show what's still locked, not just what's unlocked.
+const BADGE_CATALOG = [
+  { key: "top_scorer",           name: "Top Scorer",         desc: "Reach the global top 100",              icon: "🏆" },
+  { key: "top_manager",          name: "Top Manager",        desc: "Reach the global top 10",                icon: "⭐" },
+  { key: "trophy_md_winner",     name: "Matchday Winner",    desc: "Finish #1 in a single matchday",         icon: "🥇" },
+  { key: "trophy_fan_favourite", name: "Fan Favourite",      desc: "Send 50+ messages in the community",     icon: "❤️" },
+  { key: "transfer_master",      name: "Transfer Master",    desc: "Build a squad of 15+ different players", icon: "🔄" },
+  { key: "die_hard",             name: "Die-Hard Fan",       desc: "Active member for 30+ days",             icon: "🔥" },
+  { key: "unbeaten",             name: "Unbeaten Champion",  desc: "Score 300+ total fantasy points",        icon: "🛡️" },
+  { key: "hot_streak",           name: "Hot Streak",         desc: "Get 5 predictions in a row right",       icon: "🔥" },
+  { key: "century_predictor",    name: "Century Predictor",  desc: "Earn 100+ prediction points",            icon: "💯" },
+  { key: "sharpshooter",         name: "Sharpshooter",       desc: "Call the exact score 10+ times",         icon: "🎯" },
+  { key: "multi_sport_fan",      name: "Multi-Sport Fan",    desc: "Predict matches across 2+ sports",       icon: "🙌" },
+  { key: "triple_threat",        name: "Triple Threat",      desc: "Predict football, cricket, and rugby",   icon: "🏆" },
+  { key: "group_founder",        name: "Group Founder",      desc: "Start a private group",                  icon: "👥" },
+  { key: "poll_master",          name: "Poll Master",        desc: "Create 5+ polls for your groups",        icon: "📊" },
+];
+
 export default function ProfilePage() {
   const [profile, setProfile] = useState(EMPTY_PROFILE);
   const xpPercent = Math.min((profile.xp / getXPForNextLevel(profile.level)) * 100, 100);
@@ -37,6 +56,7 @@ export default function ProfilePage() {
   const [pointsHistory, setPointsHistory] = useState<{ md: string; pts: number }[]>([]);
   const [achievements, setAchievements] = useState<{ key: string; name: string; desc: string; icon: string; unlocked: boolean; color: string }[]>([]);
   const [trophies, setTrophies] = useState<{ name: string; desc: string; icon: string; date: string }[]>([]);
+  const lockedBadges = BADGE_CATALOG.filter((b) => !achievements.some((a) => a.key === b.key));
   const [predictionPoints, setPredictionPoints] = useState(0);
   const [platformRank, setPlatformRank] = useState<number | null>(null);
 
@@ -277,6 +297,26 @@ export default function ProfilePage() {
               </div>
             )}
           </div>
+
+          {/* Locked badges — what's still worth chasing */}
+          {lockedBadges.length > 0 && (
+            <div className="glass-card p-6">
+              <h2 className="text-base font-bold text-zff-black mb-4 flex items-center gap-2">
+                <Award className="w-4 h-4 text-slate-400" /> Still To Unlock
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {lockedBadges.map((b) => (
+                  <div key={b.key} className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200 opacity-70">
+                    <span className="text-2xl grayscale">{b.icon}</span>
+                    <div>
+                      <p className="text-sm font-semibold text-zff-black">{b.name}</p>
+                      <p className="text-xs text-muted-foreground">{b.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
       </div>

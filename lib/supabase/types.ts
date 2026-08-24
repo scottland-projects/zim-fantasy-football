@@ -432,21 +432,18 @@ export interface Database {
       user_settings: {
         Row: {
           user_id: string;
-          email_notifications: boolean;
-          push_notifications: boolean;
-          marketing_emails: boolean;
+          notifications: Json;
+          display: Json;
           updated_at: string;
         };
         Insert: {
           user_id: string;
-          email_notifications?: boolean;
-          push_notifications?: boolean;
-          marketing_emails?: boolean;
+          notifications?: Json;
+          display?: Json;
         };
         Update: {
-          email_notifications?: boolean;
-          push_notifications?: boolean;
-          marketing_emails?: boolean;
+          notifications?: Json;
+          display?: Json;
         };
       };
     };

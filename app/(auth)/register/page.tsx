@@ -118,7 +118,7 @@ export default function RegisterPage() {
           </div>
           <div>
             <label className="label">Username</label>
-            <div className="relative"><span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">@</span><input type="text" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="sfc_manager" required className="input pl-8" /></div>
+            <div className="relative"><span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">@</span><input type="text" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="tinashe_23" required className="input pl-8" /></div>
           </div>
         </div>
         <div>
