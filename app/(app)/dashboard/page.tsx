@@ -461,7 +461,7 @@ export default function DashboardPage() {
                     { href: "/market",  icon: TrendingUp, label: "Player Market",  color: "text-blue-500" },
                   ] : []),
                   { href: "/leagues",   icon: Trophy,  label: "My Groups",      color: "text-yellow-600" },
-                  { href: "/community", icon: Flame,   label: "Fan Community",  color: "text-orange-500" },
+                  { href: "/chat",      icon: Flame,   label: "Matchday Chat",  color: "text-orange-500" },
                 ].map((action) => (
                   <Link key={action.href} href={action.href}
                     className="flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 hover:border-zff-green/20 hover:bg-slate-50 transition-all group">

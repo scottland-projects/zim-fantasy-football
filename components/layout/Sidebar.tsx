@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Users, Trophy, ShoppingCart,
-  Radio, MessageSquare, MessageCircle, User, Settings, Shield,
+  Radio, MessageCircle, User, Settings, Shield,
   ChevronRight, LogOut, X, BarChart2, Target, Gamepad2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -34,9 +34,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/market",    label: "Player Market", icon: ShoppingCart,    flag: "fantasyTeams" },
   { href: "/predictions", label: "Predictions", icon: Target,          flag: "scorePredictions" },
   { href: "/leagues",   label: "Groups",        icon: Trophy,          flag: null },
-  { href: "/community?tab=chat",  label: "Chat",  icon: MessageCircle, flag: "chat" },
-  { href: "/community?tab=polls", label: "Polls", icon: BarChart2,     flag: "polls" },
-  { href: "/community",   label: "Community",    icon: MessageSquare, flag: null },
+  { href: "/chat",      label: "Chat",          icon: MessageCircle,   flag: "chat" },
+  { href: "/polls",     label: "Polls",         icon: BarChart2,       flag: "polls" },
   { href: "/profile",   label: "My Profile",    icon: User,            flag: null },
 ];
 

@@ -141,7 +141,7 @@ export default function GamesPage() {
                 <p className="text-xs text-muted-foreground mb-4">
                   Vote on admin polls or create your own for a group you belong to.
                 </p>
-                <Link href="/community" className="btn-outline w-full flex items-center justify-center gap-2 py-2.5 text-sm">
+                <Link href="/polls" className="btn-outline w-full flex items-center justify-center gap-2 py-2.5 text-sm">
                   <MessageSquare className="w-3.5 h-3.5" /> Go to Fan Polls
                 </Link>
               </div>
