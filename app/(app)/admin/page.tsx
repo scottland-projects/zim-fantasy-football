@@ -43,15 +43,15 @@ import { cn, formatPrice, getPositionColor } from "@/lib/utils";
 
 
 const FLAG_DEFS = [
-  { key: "fantasyTeams",    label: "Fantasy Team Game",  desc: "Let users build & manage a fantasy squad (My Team, Player Market)" },
-  { key: "scorePredictions", label: "Score Predictions", desc: "Let users predict match scorelines instead of managing a team" },
-  { key: "liveScoring",     label: "Live Scoring",       desc: "Stream live fantasy points during matches" },
-  { key: "transferWindow",  label: "Transfer Window",    desc: "Allow players to buy/sell in the market" },
-  { key: "chat",            label: "Matchday Chat",      desc: "Enable community chat during live matches" },
-  { key: "polls",           label: "Fan Polls",          desc: "Let fans vote on matchday polls" },
-  { key: "leagueCreation",  label: "League Creation",    desc: "Allow managers to create new private leagues" },
+  { key: "fantasyTeams",    label: "Football Fantasy Game", desc: "Let users build & manage a football fantasy squad (My Team, Player Market)" },
+  { key: "scorePredictions", label: "Score Predictions", desc: "Let users predict match scorelines across football, cricket & rugby" },
+  { key: "liveScoring",     label: "Live Scoring",       desc: "Stream live fantasy points during football matches" },
+  { key: "transferWindow",  label: "Transfer Window",    desc: "Allow players to buy/sell in the football fantasy market" },
+  { key: "chat",            label: "Live Match Chat",    desc: "Enable community chat during live matches, any sport" },
+  { key: "polls",           label: "Fan Polls",          desc: "Let fans vote on group polls" },
+  { key: "leagueCreation",  label: "Group Creation",     desc: "Allow users to create new private groups" },
   { key: "notifications",   label: "Push Notifications", desc: "Send in-app notifications to all users" },
-  { key: "marketplace",     label: "Player Market",      desc: "Show the buy/sell player market page" },
+  { key: "marketplace",     label: "Player Market",      desc: "Show the football fantasy buy/sell player market page" },
   { key: "achievements",    label: "Achievements",       desc: "Award XP badges and trophies to users" },
 ];
 
@@ -619,7 +619,7 @@ export default function AdminPage() {
                   </h2>
                   <div className="space-y-3">
                     {[
-                      { label: "Registered Managers", value: parseInt(userCount.replace(/,/g, "")) || 0, max: Math.max(parseInt(userCount.replace(/,/g, "")) || 1, 1), color: "bg-zff-green" },
+                      { label: "Registered Users", value: parseInt(userCount.replace(/,/g, "")) || 0, max: Math.max(parseInt(userCount.replace(/,/g, "")) || 1, 1), color: "bg-zff-green" },
                       { label: "Active Fantasy Teams", value: healthStats.teams, max: Math.max(healthStats.teams, 1), color: "bg-blue-500" },
                       { label: "Player Picks (Total)", value: healthStats.playersPicked, max: Math.max(healthStats.playersPicked, 1), color: "bg-amber-500" },
                       { label: "Matches Completed", value: healthStats.finishedMatches, max: Math.max(healthStats.finishedMatches, 1), color: "bg-purple-500" },

@@ -54,7 +54,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/my-team",   label: "My Team",       icon: Users,           live: false, flag: "fantasyTeams" },
   { href: "/market",    label: "Player Market", icon: ShoppingCart,    live: false, flag: "fantasyTeams" },
   { href: "/predictions", label: "Predictions", icon: Target,          live: false, flag: "scorePredictions" },
-  { href: "/leagues",   label: "Leagues",       icon: Trophy,          live: false, flag: null },
+  { href: "/leagues",   label: "Groups",        icon: Trophy,          live: false, flag: null },
   { href: "/live",         label: "Football Live", icon: Radio,       live: true,  flag: null },
   { href: "/match-stats", label: "Football Stats", icon: BarChart2,    live: false, flag: null },
   { href: "/community",   label: "Community",    icon: MessageSquare, live: false, flag: null },

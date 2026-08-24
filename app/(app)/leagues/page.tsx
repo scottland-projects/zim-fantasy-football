@@ -31,6 +31,13 @@ interface League {
 export default function LeaguesPage() {
   const [activeTab, setActiveTab] = useState<"global" | "my-leagues" | "create" | "join">("global");
   const [period, setPeriod] = useState<"overall" | "weekly" | "monthly">("overall");
+  // Fantasy standings (weekly/monthly points) only make sense for the
+  // football fantasy game — the platform-wide "Overall" view ranks by
+  // Level/XP instead, same measure as Dashboard's Overall tab, so it stays
+  // meaningful (and available) regardless of whether Fantasy Teams is on.
+  const [rankMode, setRankMode] = useState<"fantasy" | "overall">("fantasy");
+  const [overallBoard, setOverallBoard] = useState<{ rank: number; username: string; level: number; xp: number }[]>([]);
+  const fantasyTeamsEnabled = useFeatureFlag("fantasyTeams");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState({
     name: "",
@@ -106,6 +113,20 @@ export default function LeaguesPage() {
       // My leagues
       await refreshMyLeagues();
 
+      // Platform-wide Overall ranking — Level then XP, same as Dashboard.
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: overallProfiles } = await (supabase as any)
+          .from("profiles").select("id, username, level, xp")
+          .order("level", { ascending: false }).order("xp", { ascending: false }).limit(50);
+        if (overallProfiles) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setOverallBoard((overallProfiles as any[]).map((p: any, i: number) => ({
+            rank: i + 1, username: p.username, level: p.level, xp: p.xp,
+          })));
+        }
+      } catch { /* show empty */ }
+
       // Public leagues available to join
       try {
         const { leagues: pub } = await getPublicLeagues();
@@ -159,6 +180,11 @@ export default function LeaguesPage() {
     }
     loadAll();
   }, []);
+
+  // Don't default to a fantasy view when the fantasy game itself is off.
+  useEffect(() => {
+    if (!fantasyTeamsEnabled) setRankMode("overall");
+  }, [fantasyTeamsEnabled]);
 
   async function copyCode(code: string) {
     await navigator.clipboard.writeText(code);
@@ -233,7 +259,7 @@ export default function LeaguesPage() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setLeagueMembers((data as any[]).map((m: any, i: number) => ({
           rank: m.rank ?? i + 1,
-          username: m.profiles?.username ?? "Manager",
+          username: m.profiles?.username ?? "Member",
           points: m.points ?? 0,
           weekly: m.weekly_points ?? 0,
         })));
@@ -251,11 +277,11 @@ export default function LeaguesPage() {
 
   return (
     <div className="min-h-screen">
-      <TopBar title="Leagues" subtitle="Compete with fans across Zimbabwe" />
+      <TopBar title="Groups" subtitle="Private groups, group leaderboards, and platform-wide rankings" />
 
       <div className="p-4 sm:p-6 lg:p-8 space-y-5 lg:space-y-7">
-        {/* Weekly top 3 */}
-        {weeklyTop.length > 0 && <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Weekly top 3 — football fantasy only; hidden entirely when that game is off */}
+        {fantasyTeamsEnabled && weeklyTop.length > 0 && <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {weeklyTop.map((w) => (
             <div
               key={w.rank}
@@ -266,7 +292,7 @@ export default function LeaguesPage() {
               </div>
               <div>
                 <p className="font-bold text-zff-black text-sm">{w.username}</p>
-                <p className="text-xs text-muted-foreground">This week&apos;s top manager #{w.rank}</p>
+                <p className="text-xs text-muted-foreground">This week&apos;s top fantasy manager #{w.rank}</p>
               </div>
               <div className="ml-auto text-right">
                 <p className="text-lg font-display text-zff-green">{w.points}</p>
@@ -280,9 +306,9 @@ export default function LeaguesPage() {
         <div className="flex gap-2 flex-wrap">
           {[
             { id: "global",     label: "Global Rankings", icon: Globe },
-            { id: "my-leagues", label: "My Leagues",      icon: Trophy },
-            { id: "create",     label: "Create League",   icon: Plus },
-            { id: "join",       label: "Join League",     icon: Link2 },
+            { id: "my-leagues", label: "My Groups",       icon: Trophy },
+            { id: "create",     label: "Create Group",    icon: Plus },
+            { id: "join",       label: "Join Group",      icon: Link2 },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -303,15 +329,67 @@ export default function LeaguesPage() {
         <AnimatePresence mode="wait">
           {/* ── Global Rankings ── */}
           {activeTab === "global" && (
-            <motion.div key="global" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-              {(() => {
+            <motion.div key="global" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4">
+              <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1 w-fit">
+                <button onClick={() => setRankMode("overall")}
+                  className={cn("px-4 py-2 rounded-lg text-xs font-semibold transition-colors", rankMode === "overall" ? "bg-white text-zff-black shadow-sm" : "text-muted-foreground")}>
+                  Overall (Level &amp; XP)
+                </button>
+                {fantasyTeamsEnabled && (
+                  <button onClick={() => setRankMode("fantasy")}
+                    className={cn("px-4 py-2 rounded-lg text-xs font-semibold transition-colors", rankMode === "fantasy" ? "bg-white text-zff-black shadow-sm" : "text-muted-foreground")}>
+                    Football Fantasy
+                  </button>
+                )}
+              </div>
+
+              {rankMode === "overall" ? (
+                <div className="glass-card overflow-x-auto">
+                  <div className="p-4 border-b border-slate-200">
+                    <h2 className="font-bold text-zff-black">Platform-Wide Leaderboard</h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">Ranked by Level &amp; XP — every sport and game mode counts toward this, not just one.</p>
+                  </div>
+                  <table className="w-full">
+                    <thead className="bg-slate-100/20">
+                      <tr>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Rank</th>
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Member</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Level</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">XP (this level)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {overallBoard.map((entry, i) => (
+                        <motion.tr key={entry.rank} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }} className="data-table-row">
+                          <td className="px-4 py-3.5">
+                            <div className={cn("rank-badge text-xs", entry.rank === 1 ? "rank-1" : entry.rank === 2 ? "rank-2" : entry.rank === 3 ? "rank-3" : "text-muted-foreground border border-slate-200")}>
+                              {entry.rank <= 3 ? ["🥇", "🥈", "🥉"][entry.rank - 1] : entry.rank}
+                            </div>
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-xs text-zff-green font-bold">
+                                {entry.username[0]}
+                              </div>
+                              <span className="text-sm font-medium text-zff-black">{entry.username}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3.5 text-right text-sm font-bold text-zff-green">{entry.level}</td>
+                          <td className="px-4 py-3.5 text-right text-sm text-zff-black">{entry.xp.toLocaleString()}</td>
+                        </motion.tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+              (() => {
                 const sortedBoard = [...globalBoard]
                   .sort((a, b) => period === "weekly" ? b.weekly - a.weekly : period === "monthly" ? b.monthly - a.monthly : b.total - a.total)
                   .map((e, i) => ({ ...e, rank: i + 1 }));
                 return (
               <div className="glass-card overflow-x-auto">
                 <div className="flex items-center justify-between p-4 border-b border-slate-200">
-                  <h2 className="font-bold text-zff-black">Zimbabwe Leaderboard</h2>
+                  <h2 className="font-bold text-zff-black">Zimbabwe Fantasy Leaderboard</h2>
                   <div className="flex gap-1">
                     {(["overall", "weekly", "monthly"] as const).map((p) => (
                       <button
@@ -382,7 +460,8 @@ export default function LeaguesPage() {
                   </tbody>
                 </table>
               </div>
-                ); })()}
+                ); })()
+              )}
             </motion.div>
           )}
 
@@ -417,12 +496,12 @@ export default function LeaguesPage() {
                           {league.inviteCode}
                         </button>
                       )}
-                      <button onClick={() => openLeague(league)} className="btn-outline text-xs py-1.5 px-3">View League</button>
+                      <button onClick={() => openLeague(league)} className="btn-outline text-xs py-1.5 px-3">View Group</button>
                       {league.isOwner && confirmDeleteId !== league.id && (
                         <button
                           onClick={() => setConfirmDeleteId(league.id)}
                           className="p-1.5 rounded-lg border border-slate-200 text-muted-foreground hover:border-red-400/40 hover:text-red-400 transition-colors"
-                          title="Delete league"
+                          title="Delete group"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -550,7 +629,7 @@ export default function LeaguesPage() {
                     className="glass-card p-8 w-full max-w-2xl text-center"
                   >
                     <div className="text-5xl mb-4">🎉</div>
-                    <h2 className="font-bold text-zff-black text-xl mb-2">League Created!</h2>
+                    <h2 className="font-bold text-zff-black text-xl mb-2">Group Created!</h2>
                     <p className="text-muted-foreground text-sm mb-6">
                       Share the invite code with your friends to get them in.
                     </p>
@@ -569,15 +648,15 @@ export default function LeaguesPage() {
                       onClick={() => { setCreatedLeague(null); setActiveTab("my-leagues"); }}
                       className="btn-outline w-full py-3 text-sm"
                     >
-                      Go to My Leagues
+                      Go to My Groups
                     </button>
                   </motion.div>
                 ) : (
                   <motion.div key="form" className="glass-card p-6 w-full max-w-2xl">
-                    <h2 className="font-bold text-zff-black text-lg mb-5">Create Private League</h2>
+                    <h2 className="font-bold text-zff-black text-lg mb-5">Create Private Group</h2>
                     <div className="space-y-4">
                       <div>
-                        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">League Name *</label>
+                        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Group Name *</label>
                         <input
                           type="text"
                           value={createForm.name}
@@ -591,7 +670,7 @@ export default function LeaguesPage() {
                         <textarea
                           value={createForm.description}
                           onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
-                          placeholder="Tell members what this league is about..."
+                          placeholder="Tell members what this group is about..."
                           rows={2}
                           className="w-full px-4 py-3 bg-slate-100/50 border border-slate-200 rounded-xl text-zff-black placeholder:text-muted-foreground focus:outline-none focus:border-zff-green/50 text-sm resize-none"
                         />
@@ -625,7 +704,7 @@ export default function LeaguesPage() {
 
                       {!leagueCreationEnabled && (
                         <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                          League creation is temporarily paused by the club.
+                          Group creation is temporarily paused by the platform.
                         </p>
                       )}
                       <button
@@ -634,7 +713,7 @@ export default function LeaguesPage() {
                         className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-60"
                       >
                         <Plus className="w-4 h-4" />
-                        {creating ? "Creating..." : "Create League"}
+                        {creating ? "Creating..." : "Create Group"}
                       </button>
                     </div>
                   </motion.div>
@@ -646,11 +725,11 @@ export default function LeaguesPage() {
           {/* ── Join League ── */}
           {activeTab === "join" && (
             <motion.div key="join" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-              {/* Private league — invite code */}
+              {/* Private group — invite code */}
               <div className="glass-card p-6">
-                <h2 className="font-bold text-zff-black text-lg mb-2">Join a Private League</h2>
+                <h2 className="font-bold text-zff-black text-lg mb-2">Join a Private Group</h2>
                 <p className="text-sm text-muted-foreground mb-5">
-                  Enter the invite code shared by your league manager
+                  Enter the invite code shared by whoever created the group
                 </p>
                 <div className="space-y-4">
                   <div className="relative">
@@ -683,7 +762,7 @@ export default function LeaguesPage() {
                     disabled={joinCode.length < 4 || joining}
                     className="btn-primary w-full py-3 disabled:opacity-60 flex items-center justify-center gap-2"
                   >
-                    {joining ? "Joining..." : "Join League"}
+                    {joining ? "Joining..." : "Join Group"}
                   </button>
                 </div>
               </div>
@@ -775,8 +854,8 @@ export default function LeaguesPage() {
                       <thead className="bg-slate-50 border-b border-slate-200">
                         <tr>
                           <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Rank</th>
-                          <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Manager</th>
-                          <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Total Pts</th>
+                          <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Member</th>
+                          <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Fantasy Pts</th>
                           <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Weekly</th>
                         </tr>
                       </thead>
