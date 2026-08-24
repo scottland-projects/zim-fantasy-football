@@ -409,8 +409,8 @@ function PredictionsPageContent() {
                   {history.map((h) => (
                     <div key={h.matchId} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200 text-sm">
                       <div>
-                        <p className="font-semibold text-zff-black">{h.home} {h.homeScore}–{h.awayScore} {h.away}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">You predicted {h.predHome}–{h.predAway}</p>
+                        <p className="font-semibold text-zff-black">{h.home} {h.homeScore} – {h.awayScore} {h.away}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">You predicted {h.predHome} – {h.predAway}</p>
                       </div>
                       <span className={cn(
                         "text-xs font-bold px-2.5 py-1 rounded-full shrink-0",
@@ -433,7 +433,7 @@ function PredictionsPageContent() {
                   {groupPicks.map((gp) => (
                     <div key={gp.matchId} className="border border-slate-200 rounded-xl p-4">
                       <p className="text-sm font-semibold text-zff-black mb-2.5">
-                        {gp.home} {gp.status !== "scheduled" && gp.homeScore !== null ? `${gp.homeScore}–${gp.awayScore}` : "vs"} {gp.away}
+                        {gp.home} {gp.status !== "scheduled" && gp.homeScore !== null ? `${gp.homeScore} – ${gp.awayScore}` : "vs"} {gp.away}
                         {gp.status === "live" && <span className="ml-2 text-[10px] font-bold text-red-500">LIVE</span>}
                       </p>
                       {gp.picks.length === 0 ? (
@@ -444,7 +444,7 @@ function PredictionsPageContent() {
                             <div key={i} className="flex items-center justify-between text-xs">
                               <span className="text-slate-600">{pk.username}</span>
                               <span className="flex items-center gap-2">
-                                <span className="font-medium text-zff-black">{pk.home}–{pk.away}</span>
+                                <span className="font-medium text-zff-black">{pk.home} – {pk.away}</span>
                                 {pk.points !== null && (
                                   <span className={cn("font-bold px-1.5 py-0.5 rounded", pk.points === 3 ? "bg-zff-green/10 text-zff-green" : pk.points > 0 ? "bg-amber-50 text-amber-600" : "bg-slate-100 text-slate-400")}>
                                     +{pk.points}
