@@ -297,27 +297,29 @@ export default function ProfilePage() {
               </div>
             )}
           </div>
-
-          {/* Locked badges — what's still worth chasing */}
-          {lockedBadges.length > 0 && (
-            <div className="glass-card p-6">
-              <h2 className="text-base font-bold text-zff-black mb-4 flex items-center gap-2">
-                <Award className="w-4 h-4 text-slate-400" /> Still To Unlock
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {lockedBadges.map((b) => (
-                  <div key={b.key} className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200 opacity-70">
-                    <span className="text-2xl grayscale">{b.icon}</span>
-                    <div>
-                      <p className="text-sm font-semibold text-zff-black">{b.name}</p>
-                      <p className="text-xs text-muted-foreground">{b.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
+
+        {/* Locked badges — what's still worth chasing. Full page width,
+            since a 12-entry badge catalogue cramped into the same 1/3
+            column as Trophy Cabinet left most of the row empty. */}
+        {lockedBadges.length > 0 && (
+          <div className="glass-card p-6">
+            <h2 className="text-base font-bold text-zff-black mb-4 flex items-center gap-2">
+              <Award className="w-4 h-4 text-slate-400" /> Still To Unlock
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {lockedBadges.map((b) => (
+                <div key={b.key} className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200 opacity-70">
+                  <span className="text-2xl grayscale shrink-0">{b.icon}</span>
+                  <div>
+                    <p className="text-sm font-semibold text-zff-black">{b.name}</p>
+                    <p className="text-xs text-muted-foreground">{b.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
       </div>
 

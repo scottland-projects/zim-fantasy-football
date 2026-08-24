@@ -6,18 +6,12 @@ const nextConfig: NextConfig = {
       {
         source: "/(.*)",
         headers: [
-          {
-            key: "Content-Security-Policy",
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "img-src 'self' data: https://*.supabase.co https://lh3.googleusercontent.com",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://www.google-analytics.com https://analytics.google.com",
-              "font-src 'self' https://fonts.gstatic.com",
-              "frame-ancestors 'none'",
-            ].join("; "),
-          },
+          // Content-Security-Policy is set per-request in proxy.ts
+          // instead of here — it needs a fresh nonce on every request
+          // (script-src 'nonce-<value>'), which a static config value
+          // can't provide. A static 'unsafe-inline'/'unsafe-eval' script-src
+          // used to live here, which meant CSP couldn't block an injected
+          // inline script even if an XSS point were ever found.
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
