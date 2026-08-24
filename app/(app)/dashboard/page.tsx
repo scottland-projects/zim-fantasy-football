@@ -30,6 +30,9 @@ export default function DashboardPage() {
   const [predictionPoints, setPredictionPoints] = useState(0);
   const [groupsJoined, setGroupsJoined]         = useState(0);
   const [achievementsCount, setAchievementsCount] = useState(0);
+  const [platformRank, setPlatformRank]         = useState<number | null>(null);
+  const [rankTab, setRankTab] = useState<"overall" | "fantasy">("overall");
+  const [overallLeaderboard, setOverallLeaderboard] = useState<{ rank: number; username: string; level: number; xp: number }[]>([]);
   const [currentMatchday, setCurrentMatchday] = useState(12);
   const [season, setSeason] = useState("2026");
   const [leaderboard, setLeaderboard] = useState<{ rank: number; username: string; team: string; points: number; weekly: number; change: number }[]>([]);
@@ -98,6 +101,26 @@ export default function DashboardPage() {
           setPredictionPoints((preds ?? []).reduce((s: number, p: any) => s + p.points_earned, 0));
           setGroupsJoined(groupCount ?? 0);
           setAchievementsCount(achCount ?? 0);
+
+          // Platform-wide rank — by Level then XP, the same engagement-based
+          // measure every action on the platform contributes to fairly,
+          // regardless of which sport or game mode it came from.
+          const { count: aboveByLevel } = await sb.from("profiles").select("id", { count: "exact", head: true })
+            .gt("level", profileData?.level ?? 1);
+          const { count: sameLevelHigherXp } = await sb.from("profiles").select("id", { count: "exact", head: true })
+            .eq("level", profileData?.level ?? 1).gt("xp", profileData?.xp ?? 0);
+          setPlatformRank((aboveByLevel ?? 0) + (sameLevelHigherXp ?? 0) + 1);
+        }
+
+        // Platform-wide (Overall) leaderboard — ranked by Level then XP.
+        const { data: overallProfiles } = await sb
+          .from("profiles").select("id, username, level, xp")
+          .order("level", { ascending: false }).order("xp", { ascending: false }).limit(10);
+        if (overallProfiles) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setOverallLeaderboard((overallProfiles as any[]).map((p: any, i: number) => ({
+            rank: i + 1, username: p.username, level: p.level, xp: p.xp,
+          })));
         }
 
         // Active matchday
@@ -247,47 +270,97 @@ export default function DashboardPage() {
             <Bell className="w-5 h-5 text-slate-400 hover:text-zff-black cursor-pointer transition-colors shrink-0" />
           </div>
         )}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
-          <StatsCard title="Prediction Points" value={predictionPoints.toLocaleString()}   subtitle="All sports combined"        icon={Target} accentColor="blue" delay={0} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-5">
+          <StatsCard title="Platform Rank"     value={platformRank ? `#${platformRank}` : "—"}   subtitle="By Level, all sports"      icon={Crown}  accentColor="gold" delay={0} />
+          <StatsCard title="Prediction Points" value={predictionPoints.toLocaleString()}   subtitle="All sports combined"        icon={Target} accentColor="blue" delay={0.05} />
           {fantasyTeamsEnabled ? (
             <>
-              <StatsCard title="Total Points"  value={profile ? profile.fantasyPoints.toLocaleString() : "—"} subtitle="Season total"                                                           icon={Zap}        accentColor="blue" delay={0.05} />
-              <StatsCard title="Global Rank"   value={globalRank ? `#${globalRank}` : "—"}                  subtitle={`of ${totalManagers} managers`}                                              icon={Trophy}     accentColor="gold" delay={0.1} />
-              <StatsCard title="Weekly Points" value={weeklyPoints.toLocaleString()}                         subtitle={`Matchday ${currentMatchday - 1}`}                                            icon={TrendingUp} accentColor="blue" delay={0.15}  />
+              <StatsCard title="Total Points"  value={profile ? profile.fantasyPoints.toLocaleString() : "—"} subtitle="Season total"                                                           icon={Zap}        accentColor="blue" delay={0.1} />
+              <StatsCard title="Fantasy Rank"  value={globalRank ? `#${globalRank}` : "—"}                  subtitle={`of ${totalManagers} managers`}                                              icon={Trophy}     accentColor="gold" delay={0.15} />
+              <StatsCard title="Weekly Points" value={weeklyPoints.toLocaleString()}                         subtitle={`Matchday ${currentMatchday - 1}`}                                            icon={TrendingUp} accentColor="blue" delay={0.2}  />
             </>
           ) : (
             <>
-              <StatsCard title="Groups Joined"  value={groupsJoined.toLocaleString()}     subtitle="Private friend groups"      icon={Users} accentColor="gold" delay={0.05} />
-              <StatsCard title="Achievements"   value={achievementsCount.toLocaleString()} subtitle="Badges unlocked"            icon={Star}  accentColor="blue" delay={0.1} />
-              <StatsCard title="Level"          value={profile ? `${profile.level}` : "—"} subtitle={`${profile?.xp ?? 0} XP earned`} icon={Trophy} accentColor="gold" delay={0.15} />
+              <StatsCard title="Groups Joined"  value={groupsJoined.toLocaleString()}     subtitle="Private friend groups"      icon={Users} accentColor="gold" delay={0.1} />
+              <StatsCard title="Achievements"   value={achievementsCount.toLocaleString()} subtitle="Badges unlocked"            icon={Star}  accentColor="blue" delay={0.15} />
+              <StatsCard title="Level"          value={profile ? `${profile.level}` : "—"} subtitle={`${profile?.xp ?? 0} XP earned`} icon={Trophy} accentColor="gold" delay={0.2} />
             </>
           )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {fantasyTeamsEnabled ? (
           <div className="col-span-1 lg:col-span-2 glass-card p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-              <div>
-                <h2 className="section-header">Zimbabwe Rankings</h2>
-                <p className="section-subtitle">Overall fantasy leaderboard this season</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
+                <button onClick={() => setRankTab("overall")}
+                  className={cn("px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors", rankTab === "overall" ? "bg-white text-zff-black shadow-sm" : "text-muted-foreground")}>
+                  Overall
+                </button>
+                {fantasyTeamsEnabled && (
+                  <button onClick={() => setRankTab("fantasy")}
+                    className={cn("px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors", rankTab === "fantasy" ? "bg-white text-zff-black shadow-sm" : "text-muted-foreground")}>
+                    Football Fantasy
+                  </button>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Filter managers..."
-                    className="pl-8 pr-3 py-2 text-xs bg-slate-100 border border-slate-200 rounded-lg text-zff-black placeholder:text-slate-400 focus:outline-none focus:border-zff-green/40 w-36"
-                  />
+              {rankTab === "fantasy" ? (
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Filter managers..."
+                      className="pl-8 pr-3 py-2 text-xs bg-slate-100 border border-slate-200 rounded-lg text-zff-black placeholder:text-slate-400 focus:outline-none focus:border-zff-green/40 w-36"
+                    />
+                  </div>
+                  <Link href="/leagues" className="text-zff-green text-sm font-medium hover:text-zff-green-dark flex items-center gap-1 transition-colors whitespace-nowrap">
+                    Full Rankings <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
                 </div>
-                <Link href="/leagues" className="text-zff-green text-sm font-medium hover:text-zff-green-dark flex items-center gap-1 transition-colors whitespace-nowrap">
-                  Full Rankings <ChevronRight className="w-3.5 h-3.5" />
+              ) : (
+                <Link href="/predictions" className="text-zff-green text-sm font-medium hover:text-zff-green-dark flex items-center gap-1 transition-colors whitespace-nowrap">
+                  Predictions Rankings <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
-              </div>
+              )}
             </div>
+            <p className="section-subtitle mb-5">
+              {rankTab === "overall"
+                ? "Ranked by Level & XP — every sport and game mode counts toward this."
+                : "Football fantasy team standings this season."}
+            </p>
+
+            {rankTab === "overall" ? (
+              <div className="space-y-2">
+                {overallLeaderboard.length === 0 ? (
+                  <p className="text-center text-sm text-muted-foreground py-8">No members yet</p>
+                ) : overallLeaderboard.map((entry, i) => (
+                  <motion.div key={entry.rank} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
+                    className={cn("flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-3 sm:py-4 rounded-xl transition-colors",
+                      entry.username === profile?.username ? "border border-zff-green/20" : "hover:bg-slate-50")}
+                    style={entry.username === profile?.username ? { backgroundColor: "rgba(21,128,61,0.05)" } : {}}>
+                    <div className={cn("rank-badge text-xs shrink-0",
+                      entry.rank === 1 ? "rank-1" : entry.rank === 2 ? "rank-2" : entry.rank === 3 ? "rank-3" : "text-slate-500 border border-slate-200 bg-slate-50")}>
+                      {entry.rank <= 3 ? ["🥇","🥈","🥉"][entry.rank - 1] : entry.rank}
+                    </div>
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                      <Crown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={cn("text-xs sm:text-sm font-semibold truncate", entry.username === profile?.username ? "text-zff-green" : "text-zff-black")}>
+                        {entry.username === profile?.username ? "You — " : ""}@{entry.username}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">Level {entry.level}</p>
+                    </div>
+                    <div className="text-right w-20 sm:w-24 shrink-0">
+                      <p className="text-sm sm:text-base font-bold text-zff-black">{entry.xp.toLocaleString()} XP</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">this level</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
             <div className="space-y-2">
               {leaderboardLoading ? (
                 <div className="space-y-2">
@@ -330,21 +403,8 @@ export default function DashboardPage() {
                 </motion.div>
               ))}
             </div>
+            )}
           </div>
-          ) : (
-          <div className="col-span-1 lg:col-span-2 glass-card p-8 flex flex-col items-center justify-center text-center">
-            <div className="w-12 h-12 rounded-xl bg-zff-green/10 border border-zff-green/20 flex items-center justify-center mb-4">
-              <Target className="w-6 h-6 text-zff-green" />
-            </div>
-            <h2 className="section-header mb-1">Score Predictions Leaderboard</h2>
-            <p className="section-subtitle mb-5 max-w-sm">
-              Fantasy Teams is currently paused, so predictions are the main way to climb the rankings right now.
-            </p>
-            <Link href="/predictions" className="btn-primary flex items-center gap-2 text-sm px-6 py-2.5">
-              View Leaderboard <ChevronRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-          )}
 
           <div className="space-y-5">
             <div className="glass-card p-6">

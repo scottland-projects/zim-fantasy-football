@@ -546,6 +546,7 @@ BEGIN
   RETURNING id INTO v_poll_id;
 
   PERFORM _grant_xp_unchecked(v_user, 10);
+  PERFORM award_achievements(v_user);
 
   RETURN jsonb_build_object('ok', true, 'poll_id', v_poll_id);
 END;

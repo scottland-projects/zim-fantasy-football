@@ -389,6 +389,7 @@ AS $$
 DECLARE
   v_home INTEGER;
   v_away INTEGER;
+  v_user_id UUID;
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'manager')) THEN
     RAISE EXCEPTION 'not authorized';
@@ -403,6 +404,14 @@ BEGIN
   SET points_earned = calculate_prediction_points(predicted_home_score, predicted_away_score, v_home, v_away),
       updated_at    = NOW()
   WHERE match_id = p_match_id;
+
+  -- Check cross-sport achievements (streaks, multi-sport badges, etc.) for
+  -- everyone whose prediction on this match just got scored — this is how
+  -- a predictions-only user earns achievements at all, since award_achievements
+  -- previously only ran from the football-fantasy scoring chain.
+  FOR v_user_id IN SELECT DISTINCT user_id FROM score_predictions WHERE match_id = p_match_id LOOP
+    PERFORM award_achievements(v_user_id);
+  END LOOP;
 END;
 $$;
 

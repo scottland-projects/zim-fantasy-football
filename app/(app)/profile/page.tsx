@@ -6,7 +6,7 @@ import { TopBar } from "@/components/layout/TopBar";
 import { StatsCard } from "@/components/ui/StatsCard";
 import {
   User, Trophy, Star, Zap, Shield,
-  Edit, Camera, Award, Flame, Heart, X, Save, Target
+  Edit, Camera, Award, Flame, Heart, X, Save, Target, Crown
 } from "lucide-react";
 import { cn, getLevelTitle, getXPForNextLevel } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -38,6 +38,7 @@ export default function ProfilePage() {
   const [achievements, setAchievements] = useState<{ key: string; name: string; desc: string; icon: string; unlocked: boolean; color: string }[]>([]);
   const [trophies, setTrophies] = useState<{ name: string; desc: string; icon: string; date: string }[]>([]);
   const [predictionPoints, setPredictionPoints] = useState(0);
+  const [platformRank, setPlatformRank] = useState<number | null>(null);
 
   useEffect(() => {
     async function loadProfile() {
@@ -65,6 +66,14 @@ export default function ProfilePage() {
           const d = data as any;
           setProfile({ username: d.username, full_name: d.full_name ?? "", avatar_url: d.avatar_url, xp: d.xp, level: d.level, fantasy_points: d.fantasy_points, favorite_player: d.favorite_player ?? "", supporter_branch: d.supporter_branch ?? "", bio: d.bio ?? "" });
           setEditForm({ full_name: d.full_name ?? "", bio: d.bio ?? "", favorite_player: d.favorite_player ?? "", supporter_branch: d.supporter_branch ?? "" });
+
+          // Platform-wide rank — by Level then XP, same measure as the
+          // Dashboard's Overall leaderboard (see its comment for why).
+          const [{ count: aboveByLevel }, { count: sameLevelHigherXp }] = await Promise.all([
+            sb.from("profiles").select("id", { count: "exact", head: true }).gt("level", d.level ?? 1),
+            sb.from("profiles").select("id", { count: "exact", head: true }).eq("level", d.level ?? 1).gt("xp", d.xp ?? 0),
+          ]);
+          setPlatformRank((aboveByLevel ?? 0) + (sameLevelHigherXp ?? 0) + 1);
         }
 
         if (achData && achData.length > 0) {
@@ -163,10 +172,17 @@ export default function ProfilePage() {
                   <div className="p-2.5 rounded-xl bg-zff-green/10 border border-zff-green/20 shrink-0">
                     <Shield className="w-5 h-5 text-zff-green" />
                   </div>
-                  <div>
-                    <p className="text-sm font-bold text-zff-black">
-                      Level {profile.level} &mdash; {getLevelTitle(profile.level)}
-                    </p>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-bold text-zff-black">
+                        Level {profile.level} &mdash; {getLevelTitle(profile.level)}
+                      </p>
+                      {platformRank && (
+                        <span className="text-[10px] font-bold text-zff-green bg-zff-green/10 border border-zff-green/20 rounded-full px-2 py-0.5">
+                          Platform Rank #{platformRank}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       Next: {getLevelTitle(profile.level + 1)} (Level {profile.level + 1})
                     </p>
@@ -194,13 +210,23 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Stats Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
-          <StatsCard title="Prediction Points" value={predictionPoints.toLocaleString()} icon={Target} accentColor="blue" />
-          <StatsCard title="Fantasy Points" value={profile.fantasy_points.toLocaleString()} icon={Zap} accentColor="green" />
-          <StatsCard title="Level" value={`${profile.level}`} icon={Trophy} accentColor="gold" />
-          <StatsCard title="XP Earned" value={profile.xp.toLocaleString()} icon={Star} accentColor="blue" />
-          <StatsCard title="Achievements" value={`${achievements.length}`} icon={Award} accentColor="green" />
+        {/* Platform stats — the numbers that count no matter which sport you play */}
+        <div>
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 px-1">Platform</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <StatsCard title="Platform Rank" value={platformRank ? `#${platformRank}` : "—"} icon={Crown} accentColor="gold" />
+            <StatsCard title="XP Earned" value={profile.xp.toLocaleString()} icon={Star} accentColor="blue" />
+            <StatsCard title="Achievements" value={`${achievements.length}`} icon={Award} accentColor="green" />
+          </div>
+        </div>
+
+        {/* By-sport stats — kept separate since points don't compare across sports/modes */}
+        <div>
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 px-1">By Sport</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <StatsCard title="Prediction Points" value={predictionPoints.toLocaleString()} subtitle="All sports combined" icon={Target} accentColor="blue" />
+            <StatsCard title="Fantasy Points" value={profile.fantasy_points.toLocaleString()} subtitle="Football" icon={Zap} accentColor="green" />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

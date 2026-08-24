@@ -6,13 +6,24 @@
 -- it will call award_all_achievements() automatically.
 --
 -- XP rewards per badge:
---   top_scorer        200 XP
---   top_manager       500 XP
---   trophy_md_winner  300 XP
---   trophy_fan_fav    150 XP
---   transfer_master   200 XP
---   die_hard          100 XP
---   unbeaten          250 XP
+--   top_scorer         200 XP  (fantasy team — football)
+--   top_manager        500 XP  (fantasy team — football)
+--   trophy_md_winner   300 XP  (fantasy team — football)
+--   trophy_fan_fav     150 XP  (community chat — any sport)
+--   transfer_master    200 XP  (fantasy team — football)
+--   die_hard           100 XP  (fantasy team — football)
+--   unbeaten           250 XP  (fantasy team — football)
+--   hot_streak         150 XP  (predictions — any sport)
+--   century_predictor  250 XP  (predictions — all sports combined)
+--   sharpshooter       300 XP  (predictions — any sport)
+--   multi_sport_fan    200 XP  (predictions — 2+ sports)
+--   triple_threat      400 XP  (predictions — all 3 sports)
+--   group_founder      100 XP  (groups — any sport)
+--   poll_master        150 XP  (groups — any sport)
+--
+-- The last 6 need no fantasy squad at all — a predictions-only or
+-- polls-only user can earn a full set of badges without ever touching
+-- Fantasy Teams.
 --
 -- Level system: level N requires N*1000 XP to advance.
 -- XP is tracked within the current level (resets on level-up).
@@ -82,6 +93,13 @@ $$;
 CREATE OR REPLACE FUNCTION award_achievements(p_user_id UUID)
 RETURNS INTEGER   -- number of NEW badges awarded this call
 LANGUAGE plpgsql
+SECURITY DEFINER  -- the achievements table has no INSERT policy at all (by
+                   -- design — the only legitimate writer is this function),
+                   -- so without DEFINER every INSERT here would fail RLS
+                   -- for every caller, admin included. This was a live,
+                   -- pre-existing bug — no achievement had ever successfully
+                   -- been inserted through this function before this fix,
+                   -- for any user, regardless of how it was triggered.
 AS $$
 DECLARE
   v_new         INTEGER := 0;
@@ -93,9 +111,31 @@ DECLARE
   v_squad_size  BIGINT;
   v_days_member INTEGER;
 
+  -- Cross-sport / cross-mode stats — these are what let a predictions-only
+  -- or polls-only user unlock anything at all. Before this, every badge
+  -- above required a fantasy squad, so someone who never touched Fantasy
+  -- Teams could never earn a single achievement, no matter how engaged.
+  v_pred_points   INTEGER;
+  v_sports_played INTEGER;
+  v_exact_count   INTEGER;
+  v_best_streak   INTEGER;
+  v_poll_count    INTEGER;
+  v_league_owned  INTEGER;
+
   -- Reusable flag: did the last INSERT create a new row?
   v_inserted BOOLEAN;
 BEGIN
+  -- Now reachable as a side effect of ordinary user actions (predictions
+  -- scoring, creating a group poll) rather than only admin-triggered ones,
+  -- so this can no longer rely on grant_xp's own admin/manager check to
+  -- keep it from being called directly on an arbitrary target user —
+  -- restrict it to checking your own achievements, or an admin/manager
+  -- checking anyone's (the award_all_achievements bulk path).
+  IF auth.uid() IS DISTINCT FROM p_user_id
+     AND NOT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'manager')) THEN
+    RETURN 0;
+  END IF;
+
   -- ── Gather stats ──────────────────────────────────────────────────────────
   SELECT COALESCE(fantasy_points, 0),
          EXTRACT(DAY FROM NOW() - created_at)::INTEGER
@@ -118,6 +158,25 @@ BEGIN
   FROM   fantasy_team_players ftp
   JOIN   fantasy_teams ft ON ft.id = ftp.fantasy_team_id
   WHERE  ft.user_id = p_user_id;
+
+  SELECT COALESCE(SUM(sp.points_earned), 0) INTO v_pred_points
+  FROM   score_predictions sp WHERE sp.user_id = p_user_id AND sp.points_earned IS NOT NULL;
+
+  SELECT COUNT(DISTINCT m.sport) INTO v_sports_played
+  FROM   score_predictions sp JOIN matches m ON m.id = sp.match_id
+  WHERE  sp.user_id = p_user_id AND sp.points_earned IS NOT NULL;
+
+  SELECT COUNT(*) INTO v_exact_count
+  FROM   score_predictions sp WHERE sp.user_id = p_user_id AND sp.points_earned = 3;
+
+  SELECT GREATEST(
+    get_prediction_streak(p_user_id, 'football'),
+    get_prediction_streak(p_user_id, 'cricket'),
+    get_prediction_streak(p_user_id, 'rugby')
+  ) INTO v_best_streak;
+
+  SELECT COUNT(*) INTO v_poll_count   FROM polls   WHERE created_by = p_user_id;
+  SELECT COUNT(*) INTO v_league_owned FROM leagues WHERE owner_id   = p_user_id;
 
   -- ── Revoke badges whose conditions are no longer met ─────────────────────
   -- Top Scorer: must still be in top 100 AND have played (pts > 0)
@@ -158,7 +217,7 @@ BEGIN
     GET DIAGNOSTICS v_inserted = ROW_COUNT;
     IF v_inserted THEN
       v_new := v_new + 1;
-      PERFORM grant_xp(p_user_id, 200);
+      PERFORM _grant_xp_unchecked(p_user_id,200);
       INSERT INTO notifications (user_id, title, body, type)
       VALUES (p_user_id, 'Badge Unlocked: Top Scorer 🏆',
               'You reached the global top 100!', 'reward');
@@ -176,7 +235,7 @@ BEGIN
     GET DIAGNOSTICS v_inserted = ROW_COUNT;
     IF v_inserted THEN
       v_new := v_new + 1;
-      PERFORM grant_xp(p_user_id, 500);
+      PERFORM _grant_xp_unchecked(p_user_id,500);
       INSERT INTO notifications (user_id, title, body, type)
       VALUES (p_user_id, 'Badge Unlocked: Top Manager ⭐',
               'You cracked the global top 10!', 'reward');
@@ -194,16 +253,17 @@ BEGIN
     GET DIAGNOSTICS v_inserted = ROW_COUNT;
     IF v_inserted THEN
       v_new := v_new + 1;
-      PERFORM grant_xp(p_user_id, 300);
+      PERFORM _grant_xp_unchecked(p_user_id,300);
       INSERT INTO notifications (user_id, title, body, type)
       VALUES (p_user_id, 'Badge Unlocked: Matchday Winner 🥇',
               'You topped the leaderboard this matchday!', 'reward');
-    ELSE
-      PERFORM grant_xp(p_user_id, 100);
-      INSERT INTO notifications (user_id, title, body, type)
-      VALUES (p_user_id, 'Matchday Winner Again! 🥇',
-              'You topped the leaderboard — +100 XP bonus!', 'reward');
     END IF;
+    -- Deliberately no repeat-fire "Again!" bonus here anymore — this
+    -- function now runs as a side effect of many more triggers (every
+    -- prediction scored, every group poll created), not just once per
+    -- matchday, so a per-call bonus would pay out repeatedly for
+    -- unrelated actions any time this user happened to be the current
+    -- weekly leader.
   END IF;
 
   -- 4. Fan Favourite — sent 50+ community messages
@@ -217,7 +277,7 @@ BEGIN
     GET DIAGNOSTICS v_inserted = ROW_COUNT;
     IF v_inserted THEN
       v_new := v_new + 1;
-      PERFORM grant_xp(p_user_id, 150);
+      PERFORM _grant_xp_unchecked(p_user_id,150);
       INSERT INTO notifications (user_id, title, body, type)
       VALUES (p_user_id, 'Badge Unlocked: Fan Favourite ❤',
               'The community loves you — 50+ messages!', 'reward');
@@ -235,10 +295,10 @@ BEGIN
     GET DIAGNOSTICS v_inserted = ROW_COUNT;
     IF v_inserted THEN
       v_new := v_new + 1;
-      PERFORM grant_xp(p_user_id, 200);
+      PERFORM _grant_xp_unchecked(p_user_id,200);
       INSERT INTO notifications (user_id, title, body, type)
       VALUES (p_user_id, 'Badge Unlocked: Transfer Master 🔄',
-              'You''ve tried 15+ different players!', 'reward');
+              'You have tried 15+ different players!', 'reward');
     END IF;
   END IF;
 
@@ -253,10 +313,10 @@ BEGIN
     GET DIAGNOSTICS v_inserted = ROW_COUNT;
     IF v_inserted THEN
       v_new := v_new + 1;
-      PERFORM grant_xp(p_user_id, 100);
+      PERFORM _grant_xp_unchecked(p_user_id,100);
       INSERT INTO notifications (user_id, title, body, type)
       VALUES (p_user_id, 'Badge Unlocked: Die-Hard Fan 🔥',
-              'One month strong — you''re a true fan!', 'reward');
+              'One month strong — you are a true fan!', 'reward');
     END IF;
   END IF;
 
@@ -271,21 +331,169 @@ BEGIN
     GET DIAGNOSTICS v_inserted = ROW_COUNT;
     IF v_inserted THEN
       v_new := v_new + 1;
-      PERFORM grant_xp(p_user_id, 250);
+      PERFORM _grant_xp_unchecked(p_user_id,250);
       INSERT INTO notifications (user_id, title, body, type)
       VALUES (p_user_id, 'Badge Unlocked: Unbeaten Champion 🛡',
-              'You''ve scored 300+ fantasy points this season!', 'reward');
+              'You have scored 300+ fantasy points this season!', 'reward');
     END IF;
   END IF;
 
-  -- ── Base XP for every active matchday (scored > 0 this week) ────────────
-  IF v_weekly_pts > 0 THEN
-    PERFORM grant_xp(p_user_id, 25);
+  -- ── Cross-sport / cross-mode badges ───────────────────────────────────────
+  -- Everything above requires a fantasy squad. These don't — a
+  -- predictions-only or polls-only user can earn every badge in this
+  -- section without ever touching Fantasy Teams.
+
+  -- 8. Hot Streak — 5+ correct predictions in a row, on any one sport
+  IF v_best_streak >= 5 THEN
+    INSERT INTO achievements
+      (user_id, badge_key, badge_name, badge_description, badge_icon)
+    VALUES
+      (p_user_id, 'hot_streak', 'Hot Streak',
+       'Got 5 predictions in a row right', '🔥')
+    ON CONFLICT (user_id, badge_key) DO NOTHING;
+    GET DIAGNOSTICS v_inserted = ROW_COUNT;
+    IF v_inserted THEN
+      v_new := v_new + 1;
+      PERFORM _grant_xp_unchecked(p_user_id, 150);
+      INSERT INTO notifications (user_id, title, body, type)
+      VALUES (p_user_id, 'Badge Unlocked: Hot Streak 🔥',
+              'Five correct predictions in a row!', 'reward');
+    END IF;
+  END IF;
+
+  -- 9. Century Predictor — 100+ total prediction points, any sport combined
+  IF v_pred_points >= 100 THEN
+    INSERT INTO achievements
+      (user_id, badge_key, badge_name, badge_description, badge_icon)
+    VALUES
+      (p_user_id, 'century_predictor', 'Century Predictor',
+       'Earned 100+ prediction points', '💯')
+    ON CONFLICT (user_id, badge_key) DO NOTHING;
+    GET DIAGNOSTICS v_inserted = ROW_COUNT;
+    IF v_inserted THEN
+      v_new := v_new + 1;
+      PERFORM _grant_xp_unchecked(p_user_id, 250);
+      INSERT INTO notifications (user_id, title, body, type)
+      VALUES (p_user_id, 'Badge Unlocked: Century Predictor 💯',
+              'You have banked 100+ prediction points!', 'reward');
+    END IF;
+  END IF;
+
+  -- 10. Sharpshooter — 10+ exact-score predictions
+  IF v_exact_count >= 10 THEN
+    INSERT INTO achievements
+      (user_id, badge_key, badge_name, badge_description, badge_icon)
+    VALUES
+      (p_user_id, 'sharpshooter', 'Sharpshooter',
+       'Called the exact score 10+ times', '🎯')
+    ON CONFLICT (user_id, badge_key) DO NOTHING;
+    GET DIAGNOSTICS v_inserted = ROW_COUNT;
+    IF v_inserted THEN
+      v_new := v_new + 1;
+      PERFORM _grant_xp_unchecked(p_user_id, 300);
+      INSERT INTO notifications (user_id, title, body, type)
+      VALUES (p_user_id, 'Badge Unlocked: Sharpshooter 🎯',
+              '10 exact-score predictions — incredible accuracy!', 'reward');
+    END IF;
+  END IF;
+
+  -- 11. Multi-Sport Fan — scored predictions on 2+ different sports
+  IF v_sports_played >= 2 THEN
+    INSERT INTO achievements
+      (user_id, badge_key, badge_name, badge_description, badge_icon)
+    VALUES
+      (p_user_id, 'multi_sport_fan', 'Multi-Sport Fan',
+       'Predicted matches across 2+ sports', '🙌')
+    ON CONFLICT (user_id, badge_key) DO NOTHING;
+    GET DIAGNOSTICS v_inserted = ROW_COUNT;
+    IF v_inserted THEN
+      v_new := v_new + 1;
+      PERFORM _grant_xp_unchecked(p_user_id, 200);
+      INSERT INTO notifications (user_id, title, body, type)
+      VALUES (p_user_id, 'Badge Unlocked: Multi-Sport Fan 🙌',
+              'You''re predicting across more than one sport now!', 'reward');
+    END IF;
+  END IF;
+
+  -- 12. Triple Threat — scored predictions on all 3 sports
+  IF v_sports_played >= 3 THEN
+    INSERT INTO achievements
+      (user_id, badge_key, badge_name, badge_description, badge_icon)
+    VALUES
+      (p_user_id, 'triple_threat', 'Triple Threat',
+       'Predicted football, cricket, and rugby', '🏆')
+    ON CONFLICT (user_id, badge_key) DO NOTHING;
+    GET DIAGNOSTICS v_inserted = ROW_COUNT;
+    IF v_inserted THEN
+      v_new := v_new + 1;
+      PERFORM _grant_xp_unchecked(p_user_id, 400);
+      INSERT INTO notifications (user_id, title, body, type)
+      VALUES (p_user_id, 'Badge Unlocked: Triple Threat 🏆',
+              'Football, cricket, and rugby — you play them all!', 'reward');
+    END IF;
+  END IF;
+
+  -- 13. Group Founder — created a private group
+  IF v_league_owned >= 1 THEN
+    INSERT INTO achievements
+      (user_id, badge_key, badge_name, badge_description, badge_icon)
+    VALUES
+      (p_user_id, 'group_founder', 'Group Founder',
+       'Started a private group', '👥')
+    ON CONFLICT (user_id, badge_key) DO NOTHING;
+    GET DIAGNOSTICS v_inserted = ROW_COUNT;
+    IF v_inserted THEN
+      v_new := v_new + 1;
+      PERFORM _grant_xp_unchecked(p_user_id, 100);
+      INSERT INTO notifications (user_id, title, body, type)
+      VALUES (p_user_id, 'Badge Unlocked: Group Founder 👥',
+              'You started your own private group!', 'reward');
+    END IF;
+  END IF;
+
+  -- 14. Poll Master — created 5+ group polls
+  IF v_poll_count >= 5 THEN
+    INSERT INTO achievements
+      (user_id, badge_key, badge_name, badge_description, badge_icon)
+    VALUES
+      (p_user_id, 'poll_master', 'Poll Master',
+       'Created 5+ polls for your groups', '📊')
+    ON CONFLICT (user_id, badge_key) DO NOTHING;
+    GET DIAGNOSTICS v_inserted = ROW_COUNT;
+    IF v_inserted THEN
+      v_new := v_new + 1;
+      PERFORM _grant_xp_unchecked(p_user_id, 150);
+      INSERT INTO notifications (user_id, title, body, type)
+      VALUES (p_user_id, 'Badge Unlocked: Poll Master 📊',
+              'Five polls and counting — the group loves your questions!', 'reward');
+    END IF;
   END IF;
 
   RETURN v_new;
 END;
 $$;
+
+
+-- ─── Trigger: check achievements when a user creates a group ────────────────
+-- Group Founder is the one new badge with no natural RPC call site of its
+-- own (leagues are created via a direct RLS-scoped INSERT, not an RPC), so
+-- it's checked via trigger instead, same pattern as the existing
+-- on_stat_upsert/on_stat_saved triggers elsewhere in this schema.
+
+CREATE OR REPLACE FUNCTION trg_check_achievements_on_league()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  PERFORM award_achievements(NEW.owner_id);
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_league_created ON leagues;
+CREATE TRIGGER on_league_created
+  AFTER INSERT ON leagues
+  FOR EACH ROW EXECUTE FUNCTION trg_check_achievements_on_league();
 
 
 -- ─── Run for all users (called after each matchday) ──────────────────────────
@@ -381,6 +589,15 @@ BEGIN
       updated_at    = NOW()
     WHERE id = rec.team_id;
 
+    -- Base XP for playing this matchday — lives here (not in
+    -- award_achievements) specifically because this loop only runs once per
+    -- admin-triggered matchday recalculation, so it can't repeat-fire the
+    -- way it would if it lived inside a function now also called from
+    -- ordinary user actions like voting or creating a poll.
+    IF v_team_matchday_pts > 0 THEN
+      PERFORM _grant_xp_unchecked(rec.user_id, 25);
+    END IF;
+
     UPDATE profiles
     SET
       fantasy_points = (SELECT total_points FROM fantasy_teams WHERE id = rec.team_id),
@@ -422,3 +639,8 @@ REVOKE EXECUTE ON FUNCTION grant_xp FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION award_achievements FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION award_all_achievements FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION recalculate_matchday_team_points FROM PUBLIC, anon;
+-- award_achievements stays granted to `authenticated` (award_all_achievements
+-- is SECURITY INVOKER, so its nested call to award_achievements runs as the
+-- real calling role, not an elevated definer — revoking here would break
+-- that legitimate admin-triggered chain). Direct-call abuse is closed by
+-- the own-id-or-admin guard inside the function body instead.
