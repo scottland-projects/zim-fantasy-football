@@ -83,7 +83,7 @@ export default function MatchStatsPage() {
 
   return (
     <div className="min-h-screen">
-      <TopBar title="Match Stats" subtitle="Results, fixtures & performance" />
+      <TopBar title="Football Match Stats" subtitle="Football results, fixtures & performance" />
 
       <div className="p-4 sm:p-6 lg:p-8 space-y-5">
 

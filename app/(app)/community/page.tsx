@@ -20,7 +20,7 @@ interface ChatMsg {
 }
 
 
-const emojis = ["🔥", "⚽", "💚", "💪", "👑", "🎯", "😂", "❤️", "✅", "🏆"];
+const emojis = ["🔥", "⚽", "🏏", "🏉", "💪", "👑", "🎯", "😂", "❤️", "🏆"];
 
 export default function CommunityPage() {
   const [activeTab, setActiveTab] = useState<"chat" | "polls" | "discussions">("chat");
@@ -441,7 +441,7 @@ export default function CommunityPage() {
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-                        placeholder={chatEnabled ? "Cheer on your squad..." : "Chat is temporarily disabled"}
+                        placeholder={chatEnabled ? "Cheer on your team..." : "Chat is temporarily disabled"}
                         maxLength={200}
                         disabled={!chatEnabled}
                         className="flex-1 px-4 py-2.5 bg-slate-100/50 border border-slate-200 rounded-xl text-zff-black placeholder:text-muted-foreground focus:outline-none focus:border-zff-green/50 text-sm disabled:opacity-50"
@@ -479,7 +479,7 @@ export default function CommunityPage() {
 
                   <div className="glass-card p-4">
                     <h3 className="font-bold text-zff-black text-sm mb-3">Trending Topics</h3>
-                    {["#MatchdayMagic", "#DreamXI", "#GoldenBoot", "#DerbyDay", "#CleanSheet"].map((tag) => (
+                    {["#MatchdayMagic", "#PredictionKing", "#DerbyDay", "#UpsetAlert", "#Zimbabwe"].map((tag) => (
                       <div key={tag} className="py-1.5">
                         <span className="text-sm text-zff-green font-medium hover:text-zff-green-light cursor-pointer">
                           {tag}

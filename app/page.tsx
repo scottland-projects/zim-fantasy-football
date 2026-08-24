@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { Logo } from "@/components/ui/Logo";
 import { motion } from "framer-motion";
-import { Trophy, Zap, Users, ChevronRight, Shield } from "lucide-react";
+import { Trophy, Zap, Users, ChevronRight, Shield, Target } from "lucide-react";
 
 const features = [
-  { icon: Trophy, title: "Fantasy Leagues", desc: "Build your perfect squad and compete with fans across Zimbabwe" },
-  { icon: Zap, title: "Live Matchday", desc: "Real-time points, live match events, and dynamic leaderboards" },
-  { icon: Users, title: "Fan Community", desc: "Vote in fan polls and have your say" },
-  { icon: Trophy, title: "Gamification", desc: "Earn XP, unlock badges, and climb the levels from Rookie to Legend" },
+  { icon: Target, title: "Score Predictions", desc: "Predict match scores across football, cricket & rugby — no squad required" },
+  { icon: Trophy, title: "Fantasy Leagues", desc: "Build your perfect football squad and compete with fans across Zimbabwe" },
+  { icon: Users, title: "Fan Community", desc: "Vote in fan polls, chat with fellow fans, or start your own group's poll" },
+  { icon: Zap, title: "Gamification", desc: "Earn XP, unlock badges, and climb the levels from Rookie to Legend" },
 ];
 
 export default function HomePage() {
@@ -45,7 +45,7 @@ export default function HomePage() {
         <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zff-green/10 border border-zff-green/20 text-zff-green text-sm font-medium mb-8">
             <Shield className="w-4 h-4" />
-            Made for Zimbabwean Football Fans
+            Made for Zimbabwean Sports Fans
           </div>
 
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-display tracking-wider text-zff-black mb-4">
@@ -55,13 +55,13 @@ export default function HomePage() {
           </h1>
 
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-12 leading-relaxed">
-            Build your dream squad from clubs across Zimbabwe. Compete with fans nationwide.
-            Live points, real stats, pure passion.
+            Predict match results or build a fantasy squad across football, cricket, and rugby.
+            Compete with fans nationwide. Real clubs, real points, pure passion.
           </p>
 
           <div className="flex items-center justify-center gap-4">
             <Link href="/register" className="btn-primary flex items-center gap-2 text-base px-8 py-3">
-              Build Your Team <ChevronRight className="w-4 h-4" />
+              Start Playing Free <ChevronRight className="w-4 h-4" />
             </Link>
             <Link href="/login" className="btn-outline flex items-center gap-2 text-base">
               Sign In
@@ -77,10 +77,10 @@ export default function HomePage() {
           className="mt-24 grid grid-cols-2 sm:grid-cols-4 gap-5 max-w-3xl mx-auto"
         >
           {[
-            { value: "2,400+", label: "Active Managers" },
-            { value: "80+", label: "Players to Draft" },
-            { value: "15", label: "Matchdays Played" },
-            { value: "Zimbabwe", label: "#1 Fan League" },
+            { value: "2,400+", label: "Active Members" },
+            { value: "3", label: "Sports Covered" },
+            { value: "Free", label: "To Play" },
+            { value: "Zimbabwe", label: "#1 Fan Platform" },
           ].map((stat) => (
             <div key={stat.label} className="glass-card p-6 text-center">
               <p className="text-2xl font-display text-zff-green tracking-wider">{stat.value}</p>
@@ -125,7 +125,8 @@ export default function HomePage() {
         </p>
         <p className="text-xs text-muted-foreground mt-2 max-w-xl mx-auto px-4">
           Africa Fantasy is an independent fan platform and is not affiliated with, endorsed by, or officially
-          connected to ZIFA, the Premier Soccer League, or any participating football club.
+          connected to ZIFA, the Premier Soccer League, Zimbabwe Cricket, Zimbabwe Rugby Union, or any
+          participating club.
         </p>
       </footer>
     </div>

@@ -10,6 +10,7 @@ import { timeAgo } from "@/lib/utils";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { useFeatureFlag } from "@/lib/hooks/useFeatureFlag";
 
 const ACTIVITY_CONFIG: Record<string, { icon: LucideIcon; bg: string; color: string }> = {
   goal:        { icon: Zap,        bg: "bg-blue-50",   color: "text-blue-500" },
@@ -24,7 +25,11 @@ const ACTIVITY_CONFIG: Record<string, { icon: LucideIcon; bg: string; color: str
 };
 
 export default function DashboardPage() {
+  const fantasyTeamsEnabled = useFeatureFlag("fantasyTeams");
   const [search, setSearch] = useState("");
+  const [predictionPoints, setPredictionPoints] = useState(0);
+  const [groupsJoined, setGroupsJoined]         = useState(0);
+  const [achievementsCount, setAchievementsCount] = useState(0);
   const [currentMatchday, setCurrentMatchday] = useState(12);
   const [season, setSeason] = useState("2026");
   const [leaderboard, setLeaderboard] = useState<{ rank: number; username: string; team: string; points: number; weekly: number; change: number }[]>([]);
@@ -81,6 +86,18 @@ export default function DashboardPage() {
               .reduce((s: number, ftp: any) => s + (ftp.players?.price ?? 0), 0);
             setTeamValue(val);
           }
+
+          // Prediction points (all sports combined) + groups + achievements —
+          // stay meaningful regardless of whether Fantasy Team Game is on.
+          const [{ data: preds }, { count: groupCount }, { count: achCount }] = await Promise.all([
+            sb.from("score_predictions").select("points_earned").eq("user_id", user.id).not("points_earned", "is", null),
+            sb.from("league_members").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+            sb.from("achievements").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+          ]);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setPredictionPoints((preds ?? []).reduce((s: number, p: any) => s + p.points_earned, 0));
+          setGroupsJoined(groupCount ?? 0);
+          setAchievementsCount(achCount ?? 0);
         }
 
         // Active matchday
@@ -113,7 +130,7 @@ export default function DashboardPage() {
           setLeaderboard((profiles as any[]).map((p: any, i: number) => ({
             rank: i + 1,
             username: user && p.id === user.id ? "YourTeam" : p.username,
-            team: `${p.username}'s XI`,
+            team: `${p.username}'s Squad`,
             points: p.fantasy_points,
             weekly: wkMap[p.id] ?? 0,
             change: 0,
@@ -214,7 +231,7 @@ export default function DashboardPage() {
               <div className="flex items-center gap-2 mb-0.5">
                 <p className="font-semibold text-zff-black text-base truncate">{profile.username}</p>
                 <span className="text-xs font-semibold text-zff-green bg-zff-green/10 px-2 py-0.5 rounded-full whitespace-nowrap">
-                  Level {profile.level} Manager
+                  Level {profile.level} Fan
                 </span>
               </div>
               <div className="flex items-center gap-3">
@@ -231,18 +248,29 @@ export default function DashboardPage() {
           </div>
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
-          <StatsCard title="Total Points"  value={profile ? profile.fantasyPoints.toLocaleString() : "—"} subtitle="Season total"                                                           icon={Zap}        accentColor="blue" delay={0}    />
-          <StatsCard title="Global Rank"   value={globalRank ? `#${globalRank}` : "—"}                  subtitle={`of ${totalManagers} managers`}                                              icon={Trophy}     accentColor="gold" delay={0.05} />
-          <StatsCard title="Weekly Points" value={weeklyPoints.toLocaleString()}                         subtitle={`Matchday ${currentMatchday - 1}`}                                            icon={TrendingUp} accentColor="blue" delay={0.1}  />
-          <StatsCard title="Team Value"    value={teamValue > 0 ? `$${(teamValue/1_000_000).toFixed(1)}M` : "—"} subtitle={teamValue > 0 ? `Budget: $${((100_000_000-teamValue)/1_000_000).toFixed(1)}M left` : "No team yet"} icon={Star} accentColor="blue" delay={0.15} />
+          <StatsCard title="Prediction Points" value={predictionPoints.toLocaleString()}   subtitle="All sports combined"        icon={Target} accentColor="blue" delay={0} />
+          {fantasyTeamsEnabled ? (
+            <>
+              <StatsCard title="Total Points"  value={profile ? profile.fantasyPoints.toLocaleString() : "—"} subtitle="Season total"                                                           icon={Zap}        accentColor="blue" delay={0.05} />
+              <StatsCard title="Global Rank"   value={globalRank ? `#${globalRank}` : "—"}                  subtitle={`of ${totalManagers} managers`}                                              icon={Trophy}     accentColor="gold" delay={0.1} />
+              <StatsCard title="Weekly Points" value={weeklyPoints.toLocaleString()}                         subtitle={`Matchday ${currentMatchday - 1}`}                                            icon={TrendingUp} accentColor="blue" delay={0.15}  />
+            </>
+          ) : (
+            <>
+              <StatsCard title="Groups Joined"  value={groupsJoined.toLocaleString()}     subtitle="Private friend groups"      icon={Users} accentColor="gold" delay={0.05} />
+              <StatsCard title="Achievements"   value={achievementsCount.toLocaleString()} subtitle="Badges unlocked"            icon={Star}  accentColor="blue" delay={0.1} />
+              <StatsCard title="Level"          value={profile ? `${profile.level}` : "—"} subtitle={`${profile?.xp ?? 0} XP earned`} icon={Trophy} accentColor="gold" delay={0.15} />
+            </>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {fantasyTeamsEnabled ? (
           <div className="col-span-1 lg:col-span-2 glass-card p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
               <div>
                 <h2 className="section-header">Zimbabwe Rankings</h2>
-                <p className="section-subtitle">Overall leaderboard this season</p>
+                <p className="section-subtitle">Overall fantasy leaderboard this season</p>
               </div>
               <div className="flex items-center gap-2">
                 <div className="relative">
@@ -303,12 +331,29 @@ export default function DashboardPage() {
               ))}
             </div>
           </div>
+          ) : (
+          <div className="col-span-1 lg:col-span-2 glass-card p-8 flex flex-col items-center justify-center text-center">
+            <div className="w-12 h-12 rounded-xl bg-zff-green/10 border border-zff-green/20 flex items-center justify-center mb-4">
+              <Target className="w-6 h-6 text-zff-green" />
+            </div>
+            <h2 className="section-header mb-1">Score Predictions Leaderboard</h2>
+            <p className="section-subtitle mb-5 max-w-sm">
+              Fantasy Teams is currently paused, so predictions are the main way to climb the rankings right now.
+            </p>
+            <Link href="/predictions" className="btn-primary flex items-center gap-2 text-sm px-6 py-2.5">
+              View Leaderboard <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          )}
 
           <div className="space-y-5">
             <div className="glass-card p-6">
-              <h2 className="text-base font-bold text-zff-black mb-5 flex items-center gap-2.5">
-                <Calendar className="w-4 h-4 text-zff-green" /> Upcoming Matches
+              <h2 className="text-base font-bold text-zff-black mb-1 flex items-center gap-2.5">
+                <Calendar className="w-4 h-4 text-zff-green" /> Upcoming Football Matches
               </h2>
+              <p className="text-xs text-muted-foreground mb-5">
+                Predicting cricket or rugby? <Link href="/predictions" className="text-zff-green font-semibold hover:underline">See those fixtures →</Link>
+              </p>
               <div className="space-y-3">
                 {displayMatches.map((m, i) => (
                   <div key={i} className={cn("p-4 rounded-xl border", m.isLive ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-200")}>
@@ -350,9 +395,12 @@ export default function DashboardPage() {
               <h2 className="text-base font-bold text-zff-black mb-5">Quick Actions</h2>
               <div className="space-y-2.5">
                 {[
-                  { href: "/my-team",   icon: Crown,  label: "Manage My Team", color: "text-zff-green"    },
-                  { href: "/market",    icon: Target,  label: "Player Market",  color: "text-blue-500"   },
-                  { href: "/leagues",   icon: Trophy,  label: "My Leagues",     color: "text-yellow-600" },
+                  { href: "/predictions", icon: Target, label: "Score Predictions", color: "text-zff-green"    },
+                  ...(fantasyTeamsEnabled ? [
+                    { href: "/my-team", icon: Crown,  label: "Manage My Team", color: "text-zff-green"  },
+                    { href: "/market",  icon: TrendingUp, label: "Player Market",  color: "text-blue-500" },
+                  ] : []),
+                  { href: "/leagues",   icon: Trophy,  label: "My Groups",      color: "text-yellow-600" },
                   { href: "/community", icon: Flame,   label: "Fan Community",  color: "text-orange-500" },
                 ].map((action) => (
                   <Link key={action.href} href={action.href}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import { TopBar } from "@/components/layout/TopBar";
 import { Radio, Zap, TrendingUp, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -199,11 +200,14 @@ export default function LivePage() {
   if (!liveMatch) {
     return (
       <div className="min-h-screen w-full overflow-x-hidden">
-        <TopBar title="Live Matchday Center" subtitle="No match currently live" />
+        <TopBar title="Football Live Center" subtitle="No match currently live" />
         <div className="p-4 sm:p-6 lg:p-8 flex flex-col items-center justify-center min-h-[60vh] text-center">
           <Radio className="w-12 h-12 text-slate-300 mb-4" />
-          <h2 className="text-lg font-bold text-zff-black mb-2">No Live Match Right Now</h2>
-          <p className="text-sm text-muted-foreground max-w-md">Check the Dashboard for upcoming fixtures. This page updates automatically when a match goes live.</p>
+          <h2 className="text-lg font-bold text-zff-black mb-2">No Live Football Match Right Now</h2>
+          <p className="text-sm text-muted-foreground max-w-md">Check the Dashboard for upcoming fixtures. This page updates automatically when a football match goes live.</p>
+          <Link href="/predictions" className="text-sm text-zff-green font-semibold hover:underline mt-4">
+            Following cricket or rugby? Head to Score Predictions →
+          </Link>
         </div>
       </div>
     );
@@ -212,7 +216,7 @@ export default function LivePage() {
   return (
     <div className="min-h-screen w-full overflow-x-hidden">
       <TopBar
-        title="Live Matchday Center"
+        title="Football Live Center"
         subtitle={`Matchday ${liveMatch.matchday} — Now Live`}
         rightContent={<div className="live-badge"><Radio className="w-3 h-3" /> LIVE</div>}
       />

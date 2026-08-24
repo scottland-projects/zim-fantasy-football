@@ -26,6 +26,7 @@ export default function MarketPage() {
   const [busy, setBusy]               = useState<string | null>(null);
   const [showGuide, setShowGuide]     = useState(true);
   const marketplaceEnabled            = useFeatureFlag("marketplace");
+  const fantasyTeamsEnabled           = useFeatureFlag("fantasyTeams");
 
   // Team ID cached so every buy/sell doesn't need to re-fetch it
   const teamIdRef   = useRef<string | null>(null);
@@ -145,6 +146,9 @@ export default function MarketPage() {
   );
 
   // ── Render ─────────────────────────────────────────────────────────
+  if (!fantasyTeamsEnabled) {
+    return <FeatureDisabled title="Player Market" message="Fantasy Teams is temporarily paused. Try Score Predictions instead." />;
+  }
   if (!marketplaceEnabled) {
     return <FeatureDisabled title="Player Market" message="The club has temporarily paused transfers. Check back soon." />;
   }

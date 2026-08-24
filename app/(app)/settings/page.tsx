@@ -8,12 +8,13 @@ import { createClient } from "@/lib/supabase/client";
 
 const DEFAULT_SETTINGS = {
   notifications: {
-    matchReminders:    true,
-    transferDeadlines: true,
-    goalAlerts:        true,
-    leagueInvites:     true,
-    rewardUnlocks:     true,
-    weeklyDigest:      true,
+    matchReminders:      true,
+    predictionReminders: true,
+    transferDeadlines:   true,
+    goalAlerts:          true,
+    groupInvites:        true,
+    rewardUnlocks:       true,
+    weeklyDigest:        true,
   },
   display: {
     compactMode:      false,
@@ -26,19 +27,20 @@ const DEFAULT_SETTINGS = {
 type Settings = typeof DEFAULT_SETTINGS;
 
 const NOTIF_LABELS: Record<string, { label: string; desc: string }> = {
-  matchReminders:    { label: "Match Reminders",         desc: "Get notified 1 hour before kickoff" },
-  transferDeadlines: { label: "Transfer Deadline Alerts", desc: "Alerts when transfer window closes" },
-  goalAlerts:        { label: "Live Goal Alerts",         desc: "Instant alerts for your players' goals" },
-  leagueInvites:     { label: "League Invitations",       desc: "Notify when someone invites you" },
-  rewardUnlocks:     { label: "Achievement Unlocks",      desc: "Celebrate when you earn a badge" },
-  weeklyDigest:      { label: "Weekly Digest",            desc: "Summary of your performance each week" },
+  matchReminders:      { label: "Match Reminders",       desc: "Get notified before a match you follow kicks off" },
+  predictionReminders:  { label: "Prediction Reminders",  desc: "Get notified when a prediction is about to close" },
+  transferDeadlines:   { label: "Transfer Deadline Alerts", desc: "Alerts when the fantasy transfer window closes" },
+  goalAlerts:          { label: "Live Fantasy Alerts",    desc: "Instant alerts for your fantasy players' key moments" },
+  groupInvites:        { label: "Group Invitations",      desc: "Notify when someone invites you to a private group" },
+  rewardUnlocks:       { label: "Achievement Unlocks",    desc: "Celebrate when you earn a badge" },
+  weeklyDigest:        { label: "Weekly Digest",          desc: "Summary of your performance each week" },
 };
 
 const DISPLAY_LABELS: Record<string, { label: string; desc: string }> = {
   compactMode:      { label: "Compact Mode",      desc: "Tighter spacing to see more at once" },
   showAnimations:   { label: "Show Animations",   desc: "Smooth transitions and motion effects" },
-  showPlayerImages: { label: "Player Images",     desc: "Show player photo cards on the pitch" },
-  showFormGuide:    { label: "Form Colour Guide", desc: "Colour-code form ratings in the market" },
+  showPlayerImages: { label: "Player Images",     desc: "Show player photo cards in your fantasy squad" },
+  showFormGuide:    { label: "Form Colour Guide", desc: "Colour-code form ratings in the player market" },
 };
 
 function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {

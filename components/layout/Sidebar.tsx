@@ -54,8 +54,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/market",    label: "Player Market", icon: ShoppingCart,    live: false, flag: "fantasyTeams" },
   { href: "/predictions", label: "Predictions", icon: Target,          live: false, flag: "scorePredictions" },
   { href: "/leagues",   label: "Leagues",       icon: Trophy,          live: false, flag: null },
-  { href: "/live",         label: "Matchday",      icon: Radio,       live: true,  flag: null },
-  { href: "/match-stats", label: "Match Stats",  icon: BarChart2,    live: false, flag: null },
+  { href: "/live",         label: "Football Live", icon: Radio,       live: true,  flag: null },
+  { href: "/match-stats", label: "Football Stats", icon: BarChart2,    live: false, flag: null },
   { href: "/community",   label: "Community",    icon: MessageSquare, live: false, flag: null },
   { href: "/profile",   label: "My Profile",    icon: User,            live: false, flag: null },
 ];
@@ -148,7 +148,7 @@ function SidebarContent({ username, level, xp, avatarUrl, isAdmin, isManager, on
       </div>
 
       <div className="px-6 pb-5 text-center">
-        <p className="text-[10px] text-slate-400 font-mono">Africa Fantasy • Zimbabwe ⚽</p>
+        <p className="text-[10px] text-slate-400 font-mono">Africa Fantasy • Zimbabwe 🇿🇼</p>
       </div>
     </div>
   );

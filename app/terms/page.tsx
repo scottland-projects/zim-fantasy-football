@@ -28,10 +28,11 @@ function TermsOfServiceContent() {
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 mb-6 text-sm text-amber-900 leading-relaxed">
           <p className="font-bold mb-1">Independent fan platform — not affiliated with any club or league</p>
           <p>
-            Africa Fantasy is an independent fantasy sports platform created for football fans. It is not
-            affiliated with, endorsed by, or officially connected to ZIFA, the Premier Soccer League, or any
-            participating football club. All third-party names and references are used solely to identify
-            real-world football teams and players where legally permitted.
+            Africa Fantasy is an independent fantasy sports platform created for Zimbabwean sports fans, covering
+            football, cricket, and rugby. It is not affiliated with, endorsed by, or officially connected to ZIFA,
+            the Premier Soccer League, Zimbabwe Cricket, Zimbabwe Rugby Union, or any participating club. All
+            third-party names and references are used solely to identify real-world teams and players where
+            legally permitted.
           </p>
         </div>
 
@@ -55,10 +56,11 @@ function TermsOfServiceContent() {
           <section>
             <h2 className="text-base font-bold text-zff-black mb-3">2. Nature of the Platform</h2>
             <p className="mb-3">
-              Africa Fantasy is a fan-made fantasy football game covering clubs across Zimbabwe. It is:
+              Africa Fantasy is a fan-made fantasy sports platform covering football, cricket, and rugby clubs
+              across Zimbabwe. It is:
             </p>
             <ul className="list-disc list-inside space-y-2 pl-2">
-              <li>Not affiliated with, endorsed by, sponsored by, or officially connected to ZIFA, the Premier Soccer League, or any real football club.</li>
+              <li>Not affiliated with, endorsed by, sponsored by, or officially connected to ZIFA, the Premier Soccer League, Zimbabwe Cricket, Zimbabwe Rugby Union, or any real club.</li>
               <li>Built around original branding, scoring rules, and content — it does not use official club crests, kits, or copyrighted media.</li>
               <li>Free to enter. There is no pay-to-play entry fee, and the Platform does not operate any pooled-stake or betting mechanic.</li>
               <li>Funded by advertising and sponsorships; any prizes offered are provided or funded by sponsors, not paid out of user entry fees, because none are collected.</li>
@@ -81,18 +83,36 @@ function TermsOfServiceContent() {
 
           {/* 4 */}
           <section>
-            <h2 className="text-base font-bold text-zff-black mb-3">4. Fantasy Game Rules</h2>
+            <h2 className="text-base font-bold text-zff-black mb-3">4. Game Modes &amp; Rules</h2>
             <p className="mb-3">
-              Users build a fantasy squad from players across participating clubs, subject to a fixed budget and
-              squad-size rules enforced by the Platform. Points are awarded automatically based on real-world match
-              events (goals, assists, clean sheets, cards, and minutes played) as recorded by Platform administrators.
-              Scoring rules are published in-app and may be adjusted between seasons; material changes will be
-              announced in advance where practicable.
+              The Platform offers more than one way to play, and not every game mode is always available — the
+              Platform may enable or disable individual game modes at its discretion.
+            </p>
+            <p className="mb-3">
+              <strong>Fantasy Teams (football).</strong> Users build a fantasy squad from players across
+              participating football clubs, subject to a fixed budget and squad-size rules enforced by the
+              Platform. Points are awarded automatically based on real-world match events (goals, assists, clean
+              sheets, cards, and minutes played) as recorded by Platform administrators.
+            </p>
+            <p className="mb-3">
+              <strong>Score Predictions (football, cricket &amp; rugby).</strong> Users predict a match's final
+              score before kickoff. Points are awarded on accuracy — an exact score, a correct outcome and margin,
+              or a correct outcome alone — once the real result is recorded. Predictions lock at kickoff and cannot
+              be changed afterward.
+            </p>
+            <p className="mb-3">
+              <strong>Fan Polls.</strong> Users may vote on polls posted by administrators or by members of a
+              private group they belong to. Group-created polls are subject to the same content rules as any other
+              user content under Section 7.
+            </p>
+            <p className="mb-3">
+              Scoring rules for every game mode are published in-app and may be adjusted between seasons; material
+              changes will be announced in advance where practicable.
             </p>
             <p>
-              Fantasy standings are for entertainment purposes. The Platform does not accept monetary entry fees, does
-              not operate as a bookmaker, and no feature of the Platform constitutes gambling or betting as defined
-              under Zimbabwean law.
+              Standings across every game mode are for entertainment purposes. The Platform does not accept
+              monetary entry fees, does not operate as a bookmaker, and no feature of the Platform constitutes
+              gambling or betting as defined under Zimbabwean law.
             </p>
           </section>
 

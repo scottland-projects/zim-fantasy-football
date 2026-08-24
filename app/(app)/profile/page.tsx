@@ -6,7 +6,7 @@ import { TopBar } from "@/components/layout/TopBar";
 import { StatsCard } from "@/components/ui/StatsCard";
 import {
   User, Trophy, Star, Zap, Shield,
-  Edit, Camera, Award, Flame, Heart, X, Save
+  Edit, Camera, Award, Flame, Heart, X, Save, Target
 } from "lucide-react";
 import { cn, getLevelTitle, getXPForNextLevel } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -37,6 +37,7 @@ export default function ProfilePage() {
   const [pointsHistory, setPointsHistory] = useState<{ md: string; pts: number }[]>([]);
   const [achievements, setAchievements] = useState<{ key: string; name: string; desc: string; icon: string; unlocked: boolean; color: string }[]>([]);
   const [trophies, setTrophies] = useState<{ name: string; desc: string; icon: string; date: string }[]>([]);
+  const [predictionPoints, setPredictionPoints] = useState(0);
 
   useEffect(() => {
     async function loadProfile() {
@@ -47,14 +48,17 @@ export default function ProfilePage() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const sb = supabase as any;
 
-        const [{ data }, { data: achData }, { data: teamData }] = await Promise.all([
+        const [{ data }, { data: achData }, { data: teamData }, { data: preds }] = await Promise.all([
           sb.from("profiles").select("username, full_name, avatar_url, xp, level, fantasy_points, favorite_player, supporter_branch, bio").eq("id", user.id).single(),
           sb.from("achievements").select("*").eq("user_id", user.id),
           sb.from("fantasy_teams")
             .select("id, fantasy_team_players(player_id, is_starting, fantasy_team_id)")
             .eq("user_id", user.id)
             .maybeSingle(),
+          sb.from("score_predictions").select("points_earned").eq("user_id", user.id).not("points_earned", "is", null),
         ]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setPredictionPoints((preds ?? []).reduce((s: number, p: any) => s + p.points_earned, 0));
 
         if (data) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -191,8 +195,9 @@ export default function ProfilePage() {
         </div>
 
         {/* Stats Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          <StatsCard title="Total Points" value={profile.fantasy_points.toLocaleString()} icon={Zap} accentColor="green" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+          <StatsCard title="Prediction Points" value={predictionPoints.toLocaleString()} icon={Target} accentColor="blue" />
+          <StatsCard title="Fantasy Points" value={profile.fantasy_points.toLocaleString()} icon={Zap} accentColor="green" />
           <StatsCard title="Level" value={`${profile.level}`} icon={Trophy} accentColor="gold" />
           <StatsCard title="XP Earned" value={profile.xp.toLocaleString()} icon={Star} accentColor="blue" />
           <StatsCard title="Achievements" value={`${achievements.length}`} icon={Award} accentColor="green" />
@@ -201,8 +206,8 @@ export default function ProfilePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* Points History Chart */}
           <div className="col-span-1 lg:col-span-2 glass-card p-5">
-            <h2 className="section-header mb-1">Points History</h2>
-            <p className="section-subtitle mb-4">Your performance across all matchdays</p>
+            <h2 className="section-header mb-1">Fantasy Points History</h2>
+            <p className="section-subtitle mb-4">Your fantasy team&apos;s performance across all matchdays</p>
             {pointsHistory.length === 0 ? (
               <div className="flex items-center justify-center h-[220px] text-sm text-muted-foreground">No matchday data yet</div>
             ) : (
@@ -280,10 +285,10 @@ export default function ProfilePage() {
                       className="input" placeholder="Your full name" />
                   </div>
                   <div>
-                    <label className="label">Favourite Player</label>
+                    <label className="label">Favourite Player or Team</label>
                     <input type="text" value={editForm.favorite_player}
                       onChange={(e) => setEditForm({ ...editForm, favorite_player: e.target.value })}
-                      className="input" placeholder="e.g. Khama Billiat" />
+                      className="input" placeholder="e.g. your favourite club or athlete" />
                   </div>
                   <div>
                     <label className="label">Supporter Branch</label>
