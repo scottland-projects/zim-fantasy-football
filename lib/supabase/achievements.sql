@@ -1,5 +1,5 @@
 -- =============================================
--- ACHIEVEMENTS ENGINE — ZIM FANTASY FOOTBALL
+-- ACHIEVEMENTS ENGINE — AFRICA FANTASY
 -- =============================================
 -- Run AFTER scoring.sql.
 -- Call recalculate_matchday_team_points() normally —
@@ -248,7 +248,7 @@ BEGIN
       (user_id, badge_key, badge_name, badge_description, badge_icon)
     VALUES
       (p_user_id, 'die_hard', 'Die-Hard Fan',
-       'Active Zim Fantasy Football member for 30+ days', U&'\+01F525')
+       'Active Africa Fantasy member for 30+ days', U&'\+01F525')
     ON CONFLICT (user_id, badge_key) DO NOTHING;
     GET DIAGNOSTICS v_inserted = ROW_COUNT;
     IF v_inserted THEN

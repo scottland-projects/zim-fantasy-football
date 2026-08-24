@@ -515,7 +515,7 @@ export default function AdminPage() {
     <div className="min-h-screen">
       <TopBar
         title="Admin Panel"
-        subtitle="Zim Fantasy Football Management"
+        subtitle="Africa Fantasy Management"
       />
 
       <div className="p-4 sm:p-6 lg:p-8 space-y-5 lg:space-y-7">

@@ -1,10 +1,10 @@
-# Zim Fantasy Football
+# Africa Fantasy
 
 An independent, fan-made fantasy football platform covering clubs across Zimbabwe. Users draft a fantasy squad from
 players at any participating club, earn points from real match events, and compete in public and private leagues —
 free to enter, with any prizes funded by sponsors rather than user stakes.
 
-**Zim Fantasy Football is not affiliated with, endorsed by, or officially connected to ZIFA, the Premier Soccer
+**Africa Fantasy is not affiliated with, endorsed by, or officially connected to ZIFA, the Premier Soccer
 League, or any participating football club.** All third-party names and references are used solely to identify
 real-world football teams and players where legally permitted. See [`LEGAL.md`](./LEGAL.md) for the full compliance
 checklist, [Terms of Service](./app/terms/page.tsx) (`/terms`), and [Privacy Policy](./app/privacy/page.tsx)

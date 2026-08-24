@@ -11,7 +11,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Zim Fantasy Football brand colors — green & gold, deliberately not
+        // Africa Fantasy brand colors — green & gold, deliberately not
         // tied to any single club's colors (an independent platform covering
         // every Zimbabwean team shouldn't visually read as "belonging" to one).
         zff: {

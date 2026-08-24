@@ -20,7 +20,7 @@ function TermsOfServiceContent() {
             <Logo size={64} />
           </div>
           <h1 className="font-display text-3xl text-zff-black tracking-wider">TERMS OF SERVICE</h1>
-          <p className="text-sm text-muted-foreground mt-2">Zim Fantasy Football — Effective 29 May 2026</p>
+          <p className="text-sm text-muted-foreground mt-2">Africa Fantasy — Effective 29 May 2026</p>
         </div>
 
         {/* Disclaimer banner — the platform's independence is the single most
@@ -28,7 +28,7 @@ function TermsOfServiceContent() {
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 mb-6 text-sm text-amber-900 leading-relaxed">
           <p className="font-bold mb-1">Independent fan platform — not affiliated with any club or league</p>
           <p>
-            Zim Fantasy Football is an independent fantasy sports platform created for football fans. It is not
+            Africa Fantasy is an independent fantasy sports platform created for football fans. It is not
             affiliated with, endorsed by, or officially connected to ZIFA, the Premier Soccer League, or any
             participating football club. All third-party names and references are used solely to identify
             real-world football teams and players where legally permitted.
@@ -44,7 +44,7 @@ function TermsOfServiceContent() {
               <Scale className="w-4 h-4 text-zff-green shrink-0" /> 1. Acceptance of Terms
             </h2>
             <p>
-              These Terms of Service ("<strong>Terms</strong>") govern your access to and use of Zim Fantasy Football
+              These Terms of Service ("<strong>Terms</strong>") govern your access to and use of Africa Fantasy
               (the "<strong>Platform</strong>"), operated by <strong>OMNI Global</strong> ("<strong>we</strong>",
               "<strong>us</strong>", "<strong>our</strong>"). By creating an account or using the Platform, you agree
               to be bound by these Terms and by our Privacy Policy. If you do not agree, do not use the Platform.
@@ -55,7 +55,7 @@ function TermsOfServiceContent() {
           <section>
             <h2 className="text-base font-bold text-zff-black mb-3">2. Nature of the Platform</h2>
             <p className="mb-3">
-              Zim Fantasy Football is a fan-made fantasy football game covering clubs across Zimbabwe. It is:
+              Africa Fantasy is a fan-made fantasy football game covering clubs across Zimbabwe. It is:
             </p>
             <ul className="list-disc list-inside space-y-2 pl-2">
               <li>Not affiliated with, endorsed by, sponsored by, or officially connected to ZIFA, the Premier Soccer League, or any real football club.</li>
@@ -182,7 +182,7 @@ function TermsOfServiceContent() {
             <p>For questions about these Terms, contact OMNI Global at:</p>
             <address className="not-italic mt-3 p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm space-y-1">
               <p><strong>OMNI Global</strong></p>
-              <p>Zim Fantasy Football — Legal</p>
+              <p>Africa Fantasy — Legal</p>
               <p>Email: <a href="mailto:legal@omniglobal.one" className="text-zff-green hover:underline">legal@omniglobal.one</a></p>
             </address>
           </section>

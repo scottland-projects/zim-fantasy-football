@@ -20,7 +20,7 @@ function PrivacyPolicyContent() {
             <Logo size={64} />
           </div>
           <h1 className="font-display text-3xl text-zff-black tracking-wider">PRIVACY POLICY</h1>
-          <p className="text-sm text-muted-foreground mt-2">Zim Fantasy Football — Effective 29 May 2026</p>
+          <p className="text-sm text-muted-foreground mt-2">Africa Fantasy — Effective 29 May 2026</p>
         </div>
 
         {/* Policy card */}
@@ -32,7 +32,7 @@ function PrivacyPolicyContent() {
               <Shield className="w-4 h-4 text-zff-green shrink-0" /> 1. About OMNI Global
             </h2>
             <p>
-              Zim Fantasy Football ("<strong>the Platform</strong>") is owned and operated by <strong>OMNI Global</strong>
+              Africa Fantasy ("<strong>the Platform</strong>") is owned and operated by <strong>OMNI Global</strong>
               ("<strong>we</strong>", "<strong>us</strong>", "<strong>our</strong>"). OMNI Global is the data controller
               responsible for personal information collected through the Platform. By creating an account or using the
               Platform you agree to the practices described in this Privacy Policy.
@@ -66,7 +66,7 @@ function PrivacyPolicyContent() {
               <li>Send transactional communications (e.g. password resets, matchday results, league notifications).</li>
               <li>Improve, maintain, and secure the Platform.</li>
               <li>Comply with legal obligations and enforce our Terms of Service.</li>
-              <li>Send optional marketing communications about OMNI Global products and Zim Fantasy Football. You may opt out at any time by clicking the unsubscribe link in any marketing email or by emailing <strong>privacy@omniglobal.one</strong> with the subject line &ldquo;Unsubscribe&rdquo;. Opting out will not affect transactional communications required for the operation of your account.</li>
+              <li>Send optional marketing communications about OMNI Global products and Africa Fantasy. You may opt out at any time by clicking the unsubscribe link in any marketing email or by emailing <strong>privacy@omniglobal.one</strong> with the subject line &ldquo;Unsubscribe&rdquo;. Opting out will not affect transactional communications required for the operation of your account.</li>
             </ul>
             <p className="mt-3">
               We process your data on the legal bases of <em>contract performance</em> (providing the Platform),
@@ -233,7 +233,7 @@ function PrivacyPolicyContent() {
             </p>
             <address className="not-italic mt-3 p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm space-y-1">
               <p><strong>OMNI Global</strong></p>
-              <p>Zim Fantasy Football — Data Privacy</p>
+              <p>Africa Fantasy — Data Privacy</p>
               <p>Email: <a href="mailto:privacy@omniglobal.one" className="text-zff-green hover:underline">privacy@omniglobal.one</a></p>
             </address>
           </section>

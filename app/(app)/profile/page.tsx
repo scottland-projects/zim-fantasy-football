@@ -115,7 +115,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen">
-      <TopBar title="My Profile" subtitle="Your Zim Fantasy Football journey" />
+      <TopBar title="My Profile" subtitle="Your Africa Fantasy journey" />
 
       <div className="p-4 sm:p-6 lg:p-8 space-y-5 lg:space-y-7">
         {/* Profile Hero */}

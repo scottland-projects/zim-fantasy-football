@@ -1,5 +1,5 @@
 -- =============================================
--- SCORING ENGINE — ZIM FANTASY FOOTBALL
+-- SCORING ENGINE — AFRICA FANTASY
 -- =============================================
 -- Run this file in the Supabase SQL editor AFTER schema.sql
 --

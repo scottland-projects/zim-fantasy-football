@@ -87,7 +87,7 @@ export default function RegisterPage() {
           <Logo size={96} className="mx-auto" />
         </div>
         <h1 className="font-display text-3xl text-zff-black tracking-wider">JOIN THE LEAGUE</h1>
-        <p className="text-sm text-muted-foreground mt-1">Create your Zim Fantasy Football account</p>
+        <p className="text-sm text-muted-foreground mt-1">Create your Africa Fantasy account</p>
       </div>
       {confirmEmailSent ? (
         <div className="text-center space-y-5">

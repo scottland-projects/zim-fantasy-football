@@ -198,7 +198,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen">
-      <TopBar title="Dashboard" subtitle={`Zim Fantasy Football ${season} · Matchday ${currentMatchday}`} />
+      <TopBar title="Dashboard" subtitle={`Africa Fantasy ${season} · Matchday ${currentMatchday}`} />
       <div className="p-4 sm:p-6 lg:p-8 space-y-5 lg:space-y-7">
         {profile && (
           <div className="glass-card p-5 flex items-center gap-4">

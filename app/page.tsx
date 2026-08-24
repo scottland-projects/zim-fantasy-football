@@ -26,8 +26,8 @@ export default function HomePage() {
         <div className="flex items-center gap-3">
           <Logo size={44} />
           <div>
-            <p className="font-display text-xl text-zff-black tracking-wider">ZIM FANTASY</p>
-            <p className="text-[10px] text-zff-green font-medium tracking-widest">FOOTBALL</p>
+            <p className="font-display text-xl text-zff-black tracking-wider">AFRICA</p>
+            <p className="text-[10px] text-zff-green font-medium tracking-widest">FANTASY</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -49,9 +49,9 @@ export default function HomePage() {
           </div>
 
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-display tracking-wider text-zff-black mb-4">
-            ZIM FANTASY
+            AFRICA
             <br />
-            <span className="text-gradient-green">FOOTBALL</span>
+            <span className="text-gradient-green">FANTASY</span>
           </h1>
 
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-12 leading-relaxed">
@@ -117,14 +117,14 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="relative z-10 border-t border-slate-200 py-8 text-center">
         <p className="text-sm text-muted-foreground">
-          &copy; 2026 Zim Fantasy Football
+          &copy; 2026 Africa Fantasy
           {" · "}
           <a href="/terms" className="hover:text-zff-green transition-colors">Terms of Service</a>
           {" · "}
           <a href="/privacy" className="hover:text-zff-green transition-colors">Privacy Policy</a>
         </p>
         <p className="text-xs text-muted-foreground mt-2 max-w-xl mx-auto px-4">
-          Zim Fantasy Football is an independent fan platform and is not affiliated with, endorsed by, or officially
+          Africa Fantasy is an independent fan platform and is not affiliated with, endorsed by, or officially
           connected to ZIFA, the Premier Soccer League, or any participating football club.
         </p>
       </footer>

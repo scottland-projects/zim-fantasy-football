@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Security regression tests — Zim Fantasy Football
+ * Security regression tests — Africa Fantasy
  *
  * Exercises the Supabase REST/Auth API directly (the real attack surface,
  * since RLS/RPC authorization is enforced at the database, not the Next.js

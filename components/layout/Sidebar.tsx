@@ -64,8 +64,8 @@ function SidebarContent({ username, level, xp, avatarUrl, isAdmin, isManager, on
         <div className="flex items-center gap-3">
           <Logo size={44} className="shrink-0" />
           <div>
-            <p className="font-display text-lg text-zff-black tracking-wider leading-none">ZIM FANTASY</p>
-            <p className="text-[10px] text-zff-green font-semibold tracking-widest mt-0.5">FOOTBALL</p>
+            <p className="font-display text-lg text-zff-black tracking-wider leading-none">AFRICA</p>
+            <p className="text-[10px] text-zff-green font-semibold tracking-widest mt-0.5">FANTASY</p>
           </div>
         </div>
         {/* Close button — mobile only */}
@@ -134,7 +134,7 @@ function SidebarContent({ username, level, xp, avatarUrl, isAdmin, isManager, on
       </div>
 
       <div className="px-6 pb-5 text-center">
-        <p className="text-[10px] text-slate-400 font-mono">Zim Fantasy Football • Zimbabwe ⚽</p>
+        <p className="text-[10px] text-slate-400 font-mono">Africa Fantasy • Zimbabwe ⚽</p>
       </div>
     </div>
   );

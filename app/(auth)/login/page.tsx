@@ -50,7 +50,7 @@ function LoginForm() {
           <Logo size={96} className="mx-auto" />
         </div>
         <h1 className="font-display text-3xl text-zff-black tracking-wider">WELCOME BACK</h1>
-        <p className="text-sm text-muted-foreground mt-1">Sign in to Zim Fantasy Football</p>
+        <p className="text-sm text-muted-foreground mt-1">Sign in to Africa Fantasy</p>
       </div>
       {(error ?? authError) && (
         <div className="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">

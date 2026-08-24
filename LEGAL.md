@@ -1,4 +1,4 @@
-# Legal Compliance Notes — Zim Fantasy Football
+# Legal Compliance Notes — Africa Fantasy
 
 This file tracks the legal-compliance posture of the platform and what still needs a qualified Zimbabwean lawyer's
 sign-off before wider launch. It is not legal advice.

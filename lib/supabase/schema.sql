@@ -1,5 +1,5 @@
 -- =============================================
--- ZIM FANTASY FOOTBALL — SUPABASE SCHEMA
+-- AFRICA FANTASY — SUPABASE SCHEMA
 -- =============================================
 -- Independent, all-clubs fantasy football platform. Not affiliated with
 -- ZIFA, the Premier Soccer League, or any real club — every club and
