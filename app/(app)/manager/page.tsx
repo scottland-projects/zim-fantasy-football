@@ -319,9 +319,9 @@ export default function ManagerPage() {
                       className="border-b border-slate-200 bg-slate-50 overflow-hidden">
                       <div className="p-5 grid grid-cols-2 sm:grid-cols-3 gap-3">
                         <div><label className="text-xs font-medium text-muted-foreground mb-1 block">Home Team *</label>
-                          <input value={fixtureForm.home} onChange={e => setFixtureForm(p => ({ ...p, home: e.target.value }))} placeholder="e.g. Bosso" className="input text-sm py-2" /></div>
+                          <input value={fixtureForm.home} onChange={e => setFixtureForm(p => ({ ...p, home: e.target.value }))} placeholder="e.g. Highlanders FC" className="input text-sm py-2" /></div>
                         <div><label className="text-xs font-medium text-muted-foreground mb-1 block">Away Team *</label>
-                          <input value={fixtureForm.away} onChange={e => setFixtureForm(p => ({ ...p, away: e.target.value }))} placeholder="e.g. DeMbare" className="input text-sm py-2" /></div>
+                          <input value={fixtureForm.away} onChange={e => setFixtureForm(p => ({ ...p, away: e.target.value }))} placeholder="e.g. Dynamos FC" className="input text-sm py-2" /></div>
                         <div><label className="text-xs font-medium text-muted-foreground mb-1 block">Matchday *</label>
                           <input type="number" value={fixtureForm.matchday} onChange={e => setFixtureForm(p => ({ ...p, matchday: e.target.value }))} placeholder="12" className="input text-sm py-2" /></div>
                         <div><label className="text-xs font-medium text-muted-foreground mb-1 block">Kickoff *</label>

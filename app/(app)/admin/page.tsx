@@ -1041,11 +1041,11 @@ export default function AdminPage() {
                         </div>
                         <div>
                           <label className="text-xs font-medium text-muted-foreground mb-1 block">Home Team *</label>
-                          <input value={fixtureForm.home} onChange={e => setFixtureForm(p => ({ ...p, home: e.target.value }))} placeholder="e.g. Bosso" className="input text-sm py-2" />
+                          <input value={fixtureForm.home} onChange={e => setFixtureForm(p => ({ ...p, home: e.target.value }))} placeholder="e.g. Highlanders FC" className="input text-sm py-2" />
                         </div>
                         <div>
                           <label className="text-xs font-medium text-muted-foreground mb-1 block">Away Team *</label>
-                          <input value={fixtureForm.away} onChange={e => setFixtureForm(p => ({ ...p, away: e.target.value }))} placeholder="e.g. DeMbare" className="input text-sm py-2" />
+                          <input value={fixtureForm.away} onChange={e => setFixtureForm(p => ({ ...p, away: e.target.value }))} placeholder="e.g. Dynamos FC" className="input text-sm py-2" />
                         </div>
                         <div>
                           <label className="text-xs font-medium text-muted-foreground mb-1 block">Matchday *</label>

@@ -1,10 +1,13 @@
 -- =============================================
 -- AFRICA FANTASY — SUPABASE SCHEMA
 -- =============================================
--- Independent, all-clubs fantasy football platform. Not affiliated with
--- ZIFA, the Premier Soccer League, or any real club — every club and
--- player below is fictional. Run this file in the Supabase SQL editor
--- first, then scoring.sql, then achievements.sql.
+-- Independent, all-clubs fantasy sports platform covering football,
+-- cricket and rugby. Not affiliated with ZIFA, the Premier Soccer League,
+-- Zimbabwe Cricket, Zimbabwe Rugby Union, or any real club — but the club,
+-- competition and player-nickname data below reference real Zimbabwean
+-- clubs and competitions where legally permitted (see Terms of Service
+-- Section 6). Run this file in the Supabase SQL editor first, then
+-- scoring.sql, then achievements.sql.
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -64,12 +67,16 @@ GRANT SELECT (id, username, full_name, avatar_url, role, xp, level, fantasy_poin
 GRANT SELECT ON profiles TO service_role;
 
 -- =============================================
--- TEAMS TABLE — canonical list of fictional clubs
+-- TEAMS TABLE — canonical list of real Zimbabwean clubs
 -- =============================================
 CREATE TABLE IF NOT EXISTS teams (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  name TEXT NOT NULL,
+  name TEXT NOT NULL, -- official club name, e.g. "Highlanders FC"
   short_name TEXT NOT NULL,
+  -- fan nickname, e.g. "Bosso" — real and verified, but secondary to the
+  -- official name above (see docs/test-data.md for the full mapping and
+  -- how this was verified). NULL where a club has no separate nickname.
+  nickname TEXT,
   city TEXT,
   primary_color TEXT DEFAULT '#15803D',
   crest_url TEXT,
@@ -698,46 +705,48 @@ ALTER PUBLICATION supabase_realtime ADD TABLE match_events;
 ALTER PUBLICATION supabase_realtime ADD TABLE fantasy_teams;
 
 -- =============================================
--- SEED DATA — the 18 real 2026 Castle Lager PSL clubs, identified by their
--- common fan nicknames (or short name where no widely-used nickname exists)
--- rather than full registered club names. Players carry NO real names —
+-- SEED DATA — the 18 real 2026 Castle Lager PSL clubs, by their official
+-- registered name, with each club's real fan nickname carried separately in
+-- `nickname` (verified via web search 2026-08-24 against current PSL squad/
+-- fixture sources — see docs/test-data.md). Players carry NO real names —
 -- every player is seeded as "#{squad number}" only, position and club only.
 --
 -- 13 of the 18 clubs below use REAL current squad jersey numbers, researched
 -- 2026-08-24 from Transfermarkt/FM26 community squad data and cross-checked
 -- against current Castle Lager PSL standings — no player names were kept,
 -- only number + broad position (GK/DEF/MID/FWD). Coverage is uneven because
--- Zimbabwean PSL squads are poorly digitized online: some clubs (Scottland,
--- ZPC Kariba, WiFi Boys, Sugar Sugar Boyz) have 20+ verified numbers, others
--- (Gamecocks, Amakhosi) have only 1. Treat this as a best-effort real subset,
--- not a claim of squad completeness.
+-- Zimbabwean PSL squads are poorly digitized online: some clubs (Scottland
+-- FC, ZPC Kariba FC, TelOne FC, Triangle United FC) have 20+ verified
+-- numbers, others (Chicken Inn FC, Bulawayo Chiefs FC) have only 1. Treat
+-- this as a best-effort real subset, not a claim of squad completeness.
 --
--- The remaining 5 clubs (Golden Boys, Vabvamburi, Ngezi Platinum, The
--- Punters, Agama) had NO publicly findable jersey-number data at all — these
--- keep the original illustrative 14-slot template (2 GK, 4 DEF, 4 MID, 4
--- FWD, ordinary football numbering conventions) and are NOT real squad
--- numbers. See LEGAL.md before broadening any of this to real player names.
+-- The remaining 5 clubs (Hardrock FC, Herentals FC, Ngezi Platinum Stars
+-- FC, MWOS FC, Agama FC) had NO publicly findable jersey-number data at
+-- all — these keep the original illustrative 14-slot template (2 GK, 4
+-- DEF, 4 MID, 4 FWD, ordinary football numbering conventions) and are NOT
+-- real squad numbers. See LEGAL.md before broadening any of this to real
+-- player names.
 -- =============================================
 
-INSERT INTO teams (name, short_name, city, primary_color) VALUES
-  ('Scottland',         'SCO', 'Harare',        '#15803D'),
-  ('Golden Boys',        'HRK', 'Kwekwe',        '#CA8A04'),
-  ('DeMbare',            'DYN', 'Harare',        '#1D4ED8'),
-  ('Vabvamburi',         'HER', 'Harare',        '#0F766E'),
-  ('Ngezi Platinum',     'NPS', 'Ngezi',         '#7E22CE'),
-  ('Makepekepe',         'CAP', 'Harare',        '#15803D'),
-  ('Bosso',              'HIG', 'Bulawayo',      '#0F172A'),
-  ('The Punters',        'MWO', 'Norton',        '#B91C1C'),
-  ('Simba Bhora',        'SIM', 'Shamva',        '#CA8A04'),
-  ('Gamecocks',          'CHI', 'Bulawayo',      '#DC2626'),
-  ('FC Platinum',        'FCP', 'Zvishavane',    '#1D4ED8'),
-  ('Amakhosi',           'BCH', 'Bulawayo',      '#000000'),
-  ('ZPC Kariba',         'ZPC', 'Kariba',        '#0369A1'),
-  ('Hunters',            'HUN', 'Marondera',     '#166534'),
-  ('Agama',              'AGA', 'Mount Darwin',  '#B45309'),
-  ('WiFi Boys',          'TEL', 'Harare',        '#2563EB'),
-  ('Gem Boys',           'MAN', 'Mutare',        '#059669'),
-  ('Sugar Sugar Boyz',   'TRI', 'Triangle',      '#EA580C')
+INSERT INTO teams (name, nickname, short_name, city, primary_color) VALUES
+  ('Scottland FC',            'Scottland',        'SCO', 'Harare',        '#15803D'),
+  ('Hardrock FC',              'Golden Boys',      'HRK', 'Kwekwe',        '#CA8A04'),
+  ('Dynamos FC',                'DeMbare',          'DYN', 'Harare',        '#1D4ED8'),
+  ('Herentals FC',             'Vabvamburi',       'HER', 'Harare',        '#0F766E'),
+  ('Ngezi Platinum Stars FC',  'Ngezi Platinum',   'NPS', 'Ngezi',         '#7E22CE'),
+  ('CAPS United FC',           'Makepekepe',       'CAP', 'Harare',        '#15803D'),
+  ('Highlanders FC',            'Bosso',            'HIG', 'Bulawayo',      '#0F172A'),
+  ('MWOS FC',                   'The Punters',      'MWO', 'Norton',        '#B91C1C'),
+  ('Simba Bhora FC',           'Simba Bhora',      'SIM', 'Shamva',        '#CA8A04'),
+  ('Chicken Inn FC',            'Gamecocks',        'CHI', 'Bulawayo',      '#DC2626'),
+  ('FC Platinum',               NULL,               'FCP', 'Zvishavane',    '#1D4ED8'),
+  ('Bulawayo Chiefs FC',       'Amakhosi',         'BCH', 'Bulawayo',      '#000000'),
+  ('ZPC Kariba FC',             'ZPC Kariba',       'ZPC', 'Kariba',        '#0369A1'),
+  ('FC Hunters',                'Hunters',          'HUN', 'Marondera',     '#166534'),
+  ('Agama FC',                  'Agama',            'AGA', 'Mount Darwin',  '#B45309'),
+  ('TelOne FC',                 'WiFi Boys',        'TEL', 'Harare',        '#2563EB'),
+  ('Manica Diamonds FC',       'Gem Boys',         'MAN', 'Mutare',        '#059669'),
+  ('Triangle United FC',       'Sugar Sugar Boyz', 'TRI', 'Triangle',      '#EA580C')
 ON CONFLICT DO NOTHING;
 
 DO $$
@@ -745,23 +754,23 @@ DECLARE
   -- Real verified squad numbers per club, 'ClubName|POS:NUM,POS:NUM,...'.
   -- Researched 2026-08-24 (see header comment above for sourcing/caveats).
   v_real_rosters TEXT[] := ARRAY[
-    'Scottland|GK:1,GK:16,DEF:3,DEF:4,DEF:5,DEF:18,DEF:21,DEF:22,DEF:23,DEF:24,MID:6,MID:13,MID:14,MID:15,MID:25,MID:44,MID:55,MID:74,FWD:7,FWD:8,FWD:9,FWD:10,FWD:11,FWD:12,FWD:17,FWD:19,FWD:20,FWD:26,FWD:28,FWD:30,FWD:77,FWD:80',
-    'DeMbare|DEF:5,DEF:21,MID:11,MID:15,FWD:10,FWD:20',
-    'Makepekepe|GK:1,GK:6,GK:30,DEF:12,MID:8,MID:10,MID:13,MID:17,MID:19,MID:36,MID:44,MID:45,MID:89,FWD:3,FWD:9,FWD:24',
-    'Bosso|GK:1,DEF:4,MID:7,MID:19,FWD:11,FWD:22',
-    'Simba Bhora|GK:31,GK:80,DEF:3,DEF:22,MID:6,FWD:17',
-    'Gamecocks|FWD:27',
+    'Scottland FC|GK:1,GK:16,DEF:3,DEF:4,DEF:5,DEF:18,DEF:21,DEF:22,DEF:23,DEF:24,MID:6,MID:13,MID:14,MID:15,MID:25,MID:44,MID:55,MID:74,FWD:7,FWD:8,FWD:9,FWD:10,FWD:11,FWD:12,FWD:17,FWD:19,FWD:20,FWD:26,FWD:28,FWD:30,FWD:77,FWD:80',
+    'Dynamos FC|DEF:5,DEF:21,MID:11,MID:15,FWD:10,FWD:20',
+    'CAPS United FC|GK:1,GK:6,GK:30,DEF:12,MID:8,MID:10,MID:13,MID:17,MID:19,MID:36,MID:44,MID:45,MID:89,FWD:3,FWD:9,FWD:24',
+    'Highlanders FC|GK:1,DEF:4,MID:7,MID:19,FWD:11,FWD:22',
+    'Simba Bhora FC|GK:31,GK:80,DEF:3,DEF:22,MID:6,FWD:17',
+    'Chicken Inn FC|FWD:27',
     'FC Platinum|DEF:19,DEF:21,DEF:29,MID:9,MID:11,MID:25,MID:77,FWD:27,FWD:28',
-    'Amakhosi|MID:10',
-    'ZPC Kariba|GK:26,GK:39,GK:66,DEF:6,DEF:10,DEF:17,DEF:28,DEF:37,DEF:49,MID:5,MID:8,MID:12,MID:13,MID:15,MID:19,MID:22,MID:23,MID:24,MID:45,MID:90,FWD:7,FWD:11,FWD:14,FWD:99',
-    'Hunters|DEF:3,MID:4,MID:42,FWD:9',
-    'WiFi Boys|GK:1,GK:43,DEF:3,DEF:4,DEF:6,DEF:12,DEF:19,DEF:21,DEF:23,DEF:31,MID:2,MID:7,MID:11,MID:14,MID:17,MID:18,MID:77,MID:80,FWD:9,FWD:13,FWD:15,FWD:16,FWD:22,FWD:24,FWD:47,FWD:70',
-    'Gem Boys|GK:13,GK:16',
-    'Sugar Sugar Boyz|GK:16,GK:25,GK:31,DEF:2,DEF:4,DEF:7,DEF:12,DEF:14,DEF:15,DEF:26,DEF:32,MID:5,MID:6,MID:13,MID:17,MID:18,MID:19,MID:20,MID:23,MID:27,MID:28,MID:29,MID:30,FWD:1,FWD:8,FWD:9,FWD:10,FWD:11,FWD:22'
+    'Bulawayo Chiefs FC|MID:10',
+    'ZPC Kariba FC|GK:26,GK:39,GK:66,DEF:6,DEF:10,DEF:17,DEF:28,DEF:37,DEF:49,MID:5,MID:8,MID:12,MID:13,MID:15,MID:19,MID:22,MID:23,MID:24,MID:45,MID:90,FWD:7,FWD:11,FWD:14,FWD:99',
+    'FC Hunters|DEF:3,MID:4,MID:42,FWD:9',
+    'TelOne FC|GK:1,GK:43,DEF:3,DEF:4,DEF:6,DEF:12,DEF:19,DEF:21,DEF:23,DEF:31,MID:2,MID:7,MID:11,MID:14,MID:17,MID:18,MID:77,MID:80,FWD:9,FWD:13,FWD:15,FWD:16,FWD:22,FWD:24,FWD:47,FWD:70',
+    'Manica Diamonds FC|GK:13,GK:16',
+    'Triangle United FC|GK:16,GK:25,GK:31,DEF:2,DEF:4,DEF:7,DEF:12,DEF:14,DEF:15,DEF:26,DEF:32,MID:5,MID:6,MID:13,MID:17,MID:18,MID:19,MID:20,MID:23,MID:27,MID:28,MID:29,MID:30,FWD:1,FWD:8,FWD:9,FWD:10,FWD:11,FWD:22'
   ];
   -- Clubs with no publicly verifiable real squad data — kept on the
   -- original illustrative 14-slot template (2 GK, 4 DEF, 4 MID, 4 FWD).
-  v_placeholder_clubs TEXT[] := ARRAY['Golden Boys','Vabvamburi','Ngezi Platinum','The Punters','Agama'];
+  v_placeholder_clubs TEXT[] := ARRAY['Hardrock FC','Herentals FC','Ngezi Platinum Stars FC','MWOS FC','Agama FC'];
   v_slots TEXT[] := ARRAY['GK:1','GK:22','DEF:2','DEF:3','DEF:4','DEF:5','MID:6','MID:7','MID:8','MID:10','FWD:9','FWD:11','FWD:14','FWD:17'];
   v_roster TEXT;
   v_club TEXT;
@@ -861,37 +870,38 @@ BEGIN
 END $$;
 
 -- Seed fixtures — every club plays exactly once per matchday, paired using
--- well-known real rivalries where one exists (e.g. Bosso vs DeMbare).
+-- well-known real rivalries where one exists (e.g. Highlanders FC vs
+-- Dynamos FC — the "Bosso vs DeMbare" derby by nickname).
 INSERT INTO matches (home_team, away_team, kickoff_time, status, matchday, season) VALUES
-  ('Bosso',           'DeMbare',          NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
-  ('Makepekepe',      'Amakhosi',         NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
-  ('Gamecocks',       'Vabvamburi',       NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
-  ('FC Platinum',     'Ngezi Platinum',   NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
-  ('Simba Bhora',     'Golden Boys',      NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
-  ('ZPC Kariba',      'Hunters',          NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
-  ('Agama',           'WiFi Boys',        NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
-  ('Gem Boys',        'Sugar Sugar Boyz', NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
-  ('Scottland',       'The Punters',      NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
+  ('Highlanders FC',         'Dynamos FC',             NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
+  ('CAPS United FC',         'Bulawayo Chiefs FC',     NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
+  ('Chicken Inn FC',         'Herentals FC',           NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
+  ('FC Platinum',            'Ngezi Platinum Stars FC', NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
+  ('Simba Bhora FC',         'Hardrock FC',            NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
+  ('ZPC Kariba FC',          'FC Hunters',             NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
+  ('Agama FC',                'TelOne FC',              NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
+  ('Manica Diamonds FC',     'Triangle United FC',     NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
+  ('Scottland FC',            'MWOS FC',                NOW() - INTERVAL '14 days', 'finished',  1, '2026'),
 
-  ('DeMbare',         'Makepekepe',       NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
-  ('Amakhosi',        'Gamecocks',        NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
-  ('Vabvamburi',      'FC Platinum',      NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
-  ('Ngezi Platinum',  'Simba Bhora',      NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
-  ('Golden Boys',     'ZPC Kariba',       NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
-  ('Hunters',         'Agama',            NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
-  ('WiFi Boys',       'Gem Boys',         NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
-  ('Sugar Sugar Boyz','Scottland',        NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
-  ('The Punters',     'Bosso',            NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
+  ('Dynamos FC',              'CAPS United FC',         NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
+  ('Bulawayo Chiefs FC',     'Chicken Inn FC',         NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
+  ('Herentals FC',           'FC Platinum',            NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
+  ('Ngezi Platinum Stars FC', 'Simba Bhora FC',         NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
+  ('Hardrock FC',             'ZPC Kariba FC',          NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
+  ('FC Hunters',              'Agama FC',                NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
+  ('TelOne FC',               'Manica Diamonds FC',     NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
+  ('Triangle United FC',     'Scottland FC',            NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
+  ('MWOS FC',                 'Highlanders FC',         NOW() - INTERVAL '7 days',  'finished',  2, '2026'),
 
-  ('Bosso',           'Amakhosi',         NOW() + INTERVAL '2 days',  'scheduled', 3, '2026'),
-  ('Makepekepe',      'Vabvamburi',       NOW() + INTERVAL '2 days',  'scheduled', 3, '2026'),
-  ('DeMbare',         'Ngezi Platinum',   NOW() + INTERVAL '2 days',  'scheduled', 3, '2026'),
-  ('Gamecocks',       'Golden Boys',      NOW() + INTERVAL '3 days',  'scheduled', 3, '2026'),
-  ('FC Platinum',     'Hunters',          NOW() + INTERVAL '3 days',  'scheduled', 3, '2026'),
-  ('Simba Bhora',     'WiFi Boys',        NOW() + INTERVAL '3 days',  'scheduled', 3, '2026'),
-  ('ZPC Kariba',      'Sugar Sugar Boyz', NOW() + INTERVAL '3 days',  'scheduled', 3, '2026'),
-  ('Agama',           'Scottland',        NOW() + INTERVAL '3 days',  'scheduled', 3, '2026'),
-  ('Gem Boys',        'The Punters',      NOW() + INTERVAL '3 days',  'scheduled', 3, '2026')
+  ('Highlanders FC',         'Bulawayo Chiefs FC',     NOW() + INTERVAL '2 days',  'scheduled', 3, '2026'),
+  ('CAPS United FC',         'Herentals FC',           NOW() + INTERVAL '2 days',  'scheduled', 3, '2026'),
+  ('Dynamos FC',              'Ngezi Platinum Stars FC', NOW() + INTERVAL '2 days',  'scheduled', 3, '2026'),
+  ('Chicken Inn FC',         'Hardrock FC',            NOW() + INTERVAL '3 days',  'scheduled', 3, '2026'),
+  ('FC Platinum',            'FC Hunters',              NOW() + INTERVAL '3 days',  'scheduled', 3, '2026'),
+  ('Simba Bhora FC',         'TelOne FC',               NOW() + INTERVAL '3 days',  'scheduled', 3, '2026'),
+  ('ZPC Kariba FC',          'Triangle United FC',     NOW() + INTERVAL '3 days',  'scheduled', 3, '2026'),
+  ('Agama FC',                'Scottland FC',            NOW() + INTERVAL '3 days',  'scheduled', 3, '2026'),
+  ('Manica Diamonds FC',     'MWOS FC',                 NOW() + INTERVAL '3 days',  'scheduled', 3, '2026')
 ON CONFLICT DO NOTHING;
 
 -- =============================================
