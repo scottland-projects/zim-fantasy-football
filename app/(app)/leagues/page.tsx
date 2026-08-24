@@ -54,7 +54,8 @@ export default function LeaguesPage() {
   const [globalBoard, setGlobalBoard] = useState<{ rank: number; username: string; team: string; total: number; weekly: number; monthly: number; prev: number }[]>([]);
   const [weeklyTop, setWeeklyTop] = useState<{ rank: number; username: string; points: number }[]>([]);
   const [viewingLeague, setViewingLeague] = useState<League | null>(null);
-  const [leagueMembers, setLeagueMembers] = useState<{ rank: number; username: string; points: number; weekly: number }[]>([]);
+  const [leagueMembers, setLeagueMembers] = useState<{ username: string; points: number; weekly: number; level: number; xp: number }[]>([]);
+  const [modalRankMode, setModalRankMode] = useState<"fantasy" | "overall">("overall");
   const [membersLoading, setMembersLoading] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -71,7 +72,7 @@ export default function LeaguesPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data } = await (supabase as any)
         .from("league_members")
-        .select("rank, points, leagues(id, name, type, invite_code, owner_id, description, max_members, prizes)")
+        .select("points, leagues(id, name, type, invite_code, owner_id, description, max_members, prizes)")
         .eq("user_id", user.id);
       if (!data?.length) return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,29 +80,41 @@ export default function LeaguesPage() {
       if (!validRows.length) return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const leagueIds = validRows.map((m: any) => m.leagues.id);
+      // Fantasy points (points) only accrue for the football fantasy game.
+      // When that game is off, "My Rank"/"Leader" fall back to Level/XP —
+      // the one measure every member has regardless of which sport they
+      // actually follow — computed within each group, not platform-wide.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: allMembers } = await (supabase as any)
         .from("league_members")
-        .select("league_id, points, profiles(username)")
-        .in("league_id", leagueIds)
-        .order("points", { ascending: false });
-      const memberCountMap: Record<string, number> = {};
-      const leaderMap: Record<string, string> = {};
+        .select("league_id, user_id, points, profiles(username, level, xp)");
+      const byLeague: Record<string, { user_id: string; username: string; points: number; level: number; xp: number }[]> = {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (allMembers ?? []).forEach((lm: any) => {
-        memberCountMap[lm.league_id] = (memberCountMap[lm.league_id] ?? 0) + 1;
-        if (!leaderMap[lm.league_id]) leaderMap[lm.league_id] = lm.profiles?.username ?? "—";
+        if (!leagueIds.includes(lm.league_id)) return;
+        (byLeague[lm.league_id] ??= []).push({
+          user_id: lm.user_id, username: lm.profiles?.username ?? "—",
+          points: lm.points ?? 0, level: lm.profiles?.level ?? 1, xp: lm.profiles?.xp ?? 0,
+        });
       });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setLocalLeagues(validRows.map((m: any) => ({
-        id: m.leagues.id, name: m.leagues.name, type: m.leagues.type,
-        members: memberCountMap[m.leagues.id] ?? 0,
-        myRank: m.rank ?? 0, myPoints: m.points ?? 0,
-        leader: leaderMap[m.leagues.id] ?? "—",
-        inviteCode: m.leagues.invite_code ?? null,
-        isOwner: m.leagues.owner_id === user.id,
-        prizes: m.leagues.prizes ?? undefined,
-      })));
+      setLocalLeagues(validRows.map((m: any) => {
+        const members = byLeague[m.leagues.id] ?? [];
+        const sorted = fantasyTeamsEnabled
+          ? [...members].sort((a, b) => b.points - a.points)
+          : [...members].sort((a, b) => b.level - a.level || b.xp - a.xp);
+        const myIndex = sorted.findIndex((x) => x.user_id === user.id);
+        return {
+          id: m.leagues.id, name: m.leagues.name, type: m.leagues.type,
+          members: members.length,
+          myRank: myIndex >= 0 ? myIndex + 1 : 0,
+          myPoints: fantasyTeamsEnabled ? (m.points ?? 0) : (sorted[myIndex]?.xp ?? 0),
+          leader: sorted[0]?.username ?? "—",
+          inviteCode: m.leagues.invite_code ?? null,
+          isOwner: m.leagues.owner_id === user.id,
+          prizes: m.leagues.prizes ?? undefined,
+        };
+      }));
     } catch { /* keep existing */ }
   }
 
@@ -203,18 +216,7 @@ export default function LeaguesPage() {
         return;
       }
       const league = result.league;
-      setLocalLeagues((prev) => [...prev, {
-        id: league.id,
-        name: league.name,
-        type: "private",
-        members: 1,
-        myRank: 1,
-        myPoints: 0,
-        leader: "YourTeam",
-        inviteCode: league.invite_code,
-        isOwner: true,
-        prizes: createForm.prizes,
-      }]);
+      await refreshMyLeagues();
       setCreatedLeague({ name: league.name, invite_code: league.invite_code });
       setCreateForm({ name: "", description: "", prizes: { first: "", second: "", third: "" } });
     } catch { /* silently fail */ }
@@ -246,22 +248,27 @@ export default function LeaguesPage() {
   async function openLeague(league: League) {
     setViewingLeague(league);
     setLeagueMembers([]);
+    setModalRankMode(fantasyTeamsEnabled ? "fantasy" : "overall");
     setMembersLoading(true);
     try {
       const supabase = createClient();
+      // Fantasy points (points/weekly_points) only accrue for the football
+      // fantasy game. Fetch Level/XP alongside them so the modal can rank by
+      // whichever measure is actually meaningful — this group's members may
+      // not all be playing fantasy football, but every one of them has XP.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data } = await (supabase as any)
         .from("league_members")
-        .select("rank, points, weekly_points, profiles(username)")
-        .eq("league_id", league.id)
-        .order("points", { ascending: false });
+        .select("points, weekly_points, profiles(username, level, xp)")
+        .eq("league_id", league.id);
       if (data && data.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setLeagueMembers((data as any[]).map((m: any, i: number) => ({
-          rank: m.rank ?? i + 1,
+        setLeagueMembers((data as any[]).map((m: any) => ({
           username: m.profiles?.username ?? "Member",
           points: m.points ?? 0,
           weekly: m.weekly_points ?? 0,
+          level: m.profiles?.level ?? 1,
+          xp: m.profiles?.xp ?? 0,
         })));
       }
     } catch { /* show empty */ }
@@ -585,12 +592,12 @@ export default function LeaguesPage() {
 
                   <div className="grid grid-cols-3 gap-3 mb-3">
                     <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 text-center">
-                      <p className="text-xl font-display text-zff-green">#{league.myRank}</p>
+                      <p className="text-xl font-display text-zff-green">#{league.myRank || "—"}</p>
                       <p className="text-xs text-muted-foreground">My Rank</p>
                     </div>
                     <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 text-center">
                       <p className="text-xl font-display text-zff-black">{league.myPoints.toLocaleString()}</p>
-                      <p className="text-xs text-muted-foreground">My Points</p>
+                      <p className="text-xs text-muted-foreground">{fantasyTeamsEnabled ? "My Points" : "My XP"}</p>
                     </div>
                     <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 text-center">
                       <p className="text-sm font-bold text-amber-400 flex items-center justify-center gap-1">
@@ -849,22 +856,48 @@ export default function LeaguesPage() {
                     <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">Loading members…</div>
                   ) : leagueMembers.length === 0 ? (
                     <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">No members found</div>
-                  ) : (
+                  ) : (() => {
+                    const sortedMembers = modalRankMode === "fantasy"
+                      ? [...leagueMembers].sort((a, b) => b.points - a.points)
+                      : [...leagueMembers].sort((a, b) => b.level - a.level || b.xp - a.xp);
+                    return (
+                    <>
+                    {fantasyTeamsEnabled && (
+                      <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1 w-fit m-4 mb-0">
+                        <button onClick={() => setModalRankMode("overall")}
+                          className={cn("px-3 py-1.5 rounded-md text-xs font-semibold transition-colors", modalRankMode === "overall" ? "bg-white text-zff-black shadow-sm" : "text-muted-foreground")}>
+                          Overall
+                        </button>
+                        <button onClick={() => setModalRankMode("fantasy")}
+                          className={cn("px-3 py-1.5 rounded-md text-xs font-semibold transition-colors", modalRankMode === "fantasy" ? "bg-white text-zff-black shadow-sm" : "text-muted-foreground")}>
+                          Football Fantasy
+                        </button>
+                      </div>
+                    )}
                     <table className="w-full">
                       <thead className="bg-slate-50 border-b border-slate-200">
                         <tr>
                           <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Rank</th>
                           <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Member</th>
-                          <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Fantasy Pts</th>
-                          <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Weekly</th>
+                          {modalRankMode === "fantasy" ? (
+                            <>
+                              <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Fantasy Pts</th>
+                              <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Weekly</th>
+                            </>
+                          ) : (
+                            <>
+                              <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Level</th>
+                              <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">XP</th>
+                            </>
+                          )}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {leagueMembers.map((m, i) => (
+                        {sortedMembers.map((m, i) => (
                           <tr key={m.username} className={cn("transition-colors hover:bg-slate-50", m.username === viewingLeague.leader && "bg-amber-50/50")}>
                             <td className="px-4 py-3.5">
                               <div className={cn("rank-badge text-xs", i === 0 ? "rank-1" : i === 1 ? "rank-2" : i === 2 ? "rank-3" : "text-muted-foreground border border-slate-200")}>
-                                {i < 3 ? ["🥇","🥈","🥉"][i] : m.rank}
+                                {i < 3 ? ["🥇","🥈","🥉"][i] : i + 1}
                               </div>
                             </td>
                             <td className="px-5 py-3.5">
@@ -876,13 +909,24 @@ export default function LeaguesPage() {
                                 {i === 0 && <Crown className="w-3 h-3 text-amber-400" />}
                               </div>
                             </td>
-                            <td className="px-4 py-3.5 text-right text-sm font-bold text-zff-green">{m.points.toLocaleString()}</td>
-                            <td className="px-4 py-3.5 text-right text-sm text-zff-black">{m.weekly}</td>
+                            {modalRankMode === "fantasy" ? (
+                              <>
+                                <td className="px-4 py-3.5 text-right text-sm font-bold text-zff-green">{m.points.toLocaleString()}</td>
+                                <td className="px-4 py-3.5 text-right text-sm text-zff-black">{m.weekly}</td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="px-4 py-3.5 text-right text-sm font-bold text-zff-green">{m.level}</td>
+                                <td className="px-4 py-3.5 text-right text-sm text-zff-black">{m.xp.toLocaleString()}</td>
+                              </>
+                            )}
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                  )}
+                    </>
+                    );
+                  })()}
                 </div>
               </div>
             </motion.div>
