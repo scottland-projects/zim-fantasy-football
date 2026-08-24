@@ -3,11 +3,19 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { TopBar } from "@/components/layout/TopBar";
-import { Target, Trophy, Check, Info, Medal } from "lucide-react";
+import { Target, Trophy, Check, Info, Medal, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useFeatureFlag } from "@/lib/hooks/useFeatureFlag";
 import { FeatureDisabled } from "@/components/ui/FeatureDisabled";
+
+type Sport = "football" | "cricket" | "rugby";
+
+const SPORTS: { id: Sport; label: string; unit: string; icon: typeof Target }[] = [
+  { id: "football", label: "Football", unit: "goals", icon: Target },
+  { id: "cricket",  label: "Cricket",  unit: "total runs", icon: Circle },
+  { id: "rugby",    label: "Rugby",    unit: "points", icon: Trophy },
+];
 
 interface UpcomingMatch {
   id: string;
@@ -38,6 +46,7 @@ interface LeaderboardRow {
 export default function PredictionsPage() {
   const scorePredictionsEnabled = useFeatureFlag("scorePredictions");
 
+  const [sport, setSport] = useState<Sport>("football");
   const [upcoming, setUpcoming] = useState<UpcomingMatch[]>([]);
   const [drafts, setDrafts] = useState<Record<string, { home: string; away: string }>>({});
   const [saved, setSaved] = useState<Record<string, { home: number; away: number }>>({});
@@ -49,26 +58,39 @@ export default function PredictionsPage() {
   const [myTotal, setMyTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
+  const activeSport = SPORTS.find((s) => s.id === sport)!;
+
+  const load = useCallback(async (forSport: Sport) => {
+    setLoading(true);
     const supabase = createClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
     const { data: { user } } = await supabase.auth.getUser();
 
-    const { data: matches } = await sb
+    // All matches for this sport once, reused for the upcoming list, the
+    // "your results" history, and the leaderboard — avoids extra round trips.
+    const { data: sportMatches } = await sb
       .from("matches")
-      .select("id, home_team, away_team, kickoff_time, matchday")
-      .eq("sport", "football")
-      .eq("status", "scheduled")
-      .order("kickoff_time", { ascending: true })
-      .limit(20);
-    setUpcoming(matches ?? []);
+      .select("id, home_team, away_team, kickoff_time, matchday, status, home_score, away_score")
+      .eq("sport", forSport)
+      .order("kickoff_time", { ascending: true });
 
-    if (user) {
+    const allMatches = sportMatches ?? [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const matchById = new Map<string, any>(allMatches.map((m: any) => [m.id, m]));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setUpcoming(allMatches.filter((m: any) => m.status === "scheduled").slice(0, 20));
+
+    let newSaved: Record<string, { home: number; away: number }> = {};
+    let newHistory: FinishedPrediction[] = [];
+    let newTotal = 0;
+
+    if (user && allMatches.length > 0) {
       const { data: myPreds } = await sb
         .from("score_predictions")
         .select("match_id, predicted_home_score, predicted_away_score, points_earned")
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .in("match_id", allMatches.map((m: { id: string }) => m.id));
 
       const savedMap: Record<string, { home: number; away: number }> = {};
       const draftMap: Record<string, { home: string; away: string }> = {};
@@ -77,71 +99,70 @@ export default function PredictionsPage() {
         savedMap[p.match_id] = { home: p.predicted_home_score, away: p.predicted_away_score };
         draftMap[p.match_id] = { home: String(p.predicted_home_score), away: String(p.predicted_away_score) };
       });
-      setSaved(savedMap);
-      setDrafts((prev) => ({ ...draftMap, ...prev }));
+      newSaved = savedMap;
+      setDrafts(draftMap);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const scoredPreds = (myPreds ?? []).filter((p: any) => p.points_earned !== null);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setMyTotal(scoredPreds.reduce((s: number, p: any) => s + p.points_earned, 0));
+      newTotal = scoredPreds.reduce((s: number, p: any) => s + p.points_earned, 0);
 
-      if (scoredPreds.length > 0) {
-        const { data: finishedMatches } = await sb
-          .from("matches")
-          .select("id, home_team, away_team, home_score, away_score")
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .in("id", scoredPreds.map((p: any) => p.match_id));
+      newHistory = scoredPreds
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const matchById = new Map<string, any>((finishedMatches ?? []).map((m: any) => [m.id, m]));
-        const rows: FinishedPrediction[] = scoredPreds
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .map((p: any) => {
-            const m = matchById.get(p.match_id);
-            if (!m) return null;
-            return {
-              matchId: p.match_id, home: m.home_team, away: m.away_team,
-              homeScore: m.home_score, awayScore: m.away_score,
-              predHome: p.predicted_home_score, predAway: p.predicted_away_score,
-              points: p.points_earned,
-            };
-          })
-          .filter(Boolean) as FinishedPrediction[];
-        setHistory(rows.slice(0, 10));
+        .map((p: any) => {
+          const m = matchById.get(p.match_id);
+          if (!m) return null;
+          return {
+            matchId: p.match_id, home: m.home_team, away: m.away_team,
+            homeScore: m.home_score, awayScore: m.away_score,
+            predHome: p.predicted_home_score, predAway: p.predicted_away_score,
+            points: p.points_earned,
+          };
+        })
+        .filter(Boolean)
+        .slice(0, 10) as FinishedPrediction[];
+    }
+    setSaved(newSaved);
+    setHistory(newHistory);
+    setMyTotal(newTotal);
+
+    // Leaderboard — aggregate every scored prediction on this sport's matches, top 10.
+    let newLeaderboard: LeaderboardRow[] = [];
+    if (allMatches.length > 0) {
+      const { data: allScored } = await sb
+        .from("score_predictions")
+        .select("user_id, points_earned")
+        .not("points_earned", "is", null)
+        .in("match_id", allMatches.map((m: { id: string }) => m.id));
+      const totals = new Map<string, { points: number; exact: number }>();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (allScored ?? []).forEach((p: any) => {
+        const cur = totals.get(p.user_id) ?? { points: 0, exact: 0 };
+        cur.points += p.points_earned;
+        if (p.points_earned === 3) cur.exact += 1;
+        totals.set(p.user_id, cur);
+      });
+      const topIds = [...totals.entries()].sort((a, b) => b[1].points - a[1].points).slice(0, 10);
+      if (topIds.length > 0) {
+        const { data: profs } = await sb.from("profiles").select("id, username").in("id", topIds.map(([id]) => id));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const nameById = new Map<string, string>((profs ?? []).map((p: any) => [p.id, p.username]));
+        newLeaderboard = topIds.map(([id, v]) => ({ userId: id, username: nameById.get(id) ?? "Manager", points: v.points, exact: v.exact }));
       }
     }
-
-    // Leaderboard — aggregate every scored prediction per user, take the top 10.
-    const { data: allScored } = await sb
-      .from("score_predictions")
-      .select("user_id, points_earned")
-      .not("points_earned", "is", null);
-    const totals = new Map<string, { points: number; exact: number }>();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (allScored ?? []).forEach((p: any) => {
-      const cur = totals.get(p.user_id) ?? { points: 0, exact: 0 };
-      cur.points += p.points_earned;
-      if (p.points_earned === 3) cur.exact += 1;
-      totals.set(p.user_id, cur);
-    });
-    const topIds = [...totals.entries()].sort((a, b) => b[1].points - a[1].points).slice(0, 10);
-    if (topIds.length > 0) {
-      const { data: profs } = await sb.from("profiles").select("id, username").in("id", topIds.map(([id]) => id));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const nameById = new Map<string, string>((profs ?? []).map((p: any) => [p.id, p.username]));
-      setLeaderboard(topIds.map(([id, v]) => ({ userId: id, username: nameById.get(id) ?? "Manager", points: v.points, exact: v.exact })));
-    }
+    setLeaderboard(newLeaderboard);
 
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(sport); }, [sport, load]);
 
   async function submit(matchId: string) {
     const draft = drafts[matchId];
     const home = parseInt(draft?.home ?? "", 10);
     const away = parseInt(draft?.away ?? "", 10);
-    if (isNaN(home) || isNaN(away) || home < 0 || away < 0 || home > 20 || away > 20) {
-      setErrorByMatch((prev) => ({ ...prev, [matchId]: "Enter a score from 0–20 for both teams" }));
+    if (isNaN(home) || isNaN(away) || home < 0 || away < 0 || home > 999 || away > 999) {
+      setErrorByMatch((prev) => ({ ...prev, [matchId]: `Enter a valid ${activeSport.unit} total for both teams` }));
       return;
     }
     setErrorByMatch((prev) => ({ ...prev, [matchId]: "" }));
@@ -170,15 +191,30 @@ export default function PredictionsPage() {
       <TopBar title="Score Predictions" subtitle="Predict the final score — no squad required" />
 
       <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-5 flex items-start gap-3">
+        <div className="flex gap-2">
+          {SPORTS.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => setSport(s.id)}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border transition-colors",
+                sport === s.id ? "bg-zff-green text-white border-zff-green" : "bg-white text-slate-500 border-slate-200 hover:border-zff-green/40"
+              )}
+            >
+              <s.icon className="w-4 h-4" /> {s.label}
+            </button>
+          ))}
+        </div>
+
+        <motion.div key={sport} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-5 flex items-start gap-3">
           <div className="p-2 rounded-xl bg-zff-green/10 border border-zff-green/20 shrink-0">
             <Info className="w-4 h-4 text-zff-green" />
           </div>
           <div className="text-sm text-slate-600 leading-relaxed">
-            <span className="font-semibold text-zff-black">How it works:</span> predict the final score of any
-            upcoming match before kickoff. Exact scoreline = <span className="font-semibold text-zff-black">3 pts</span>,
-            correct winner/draw + correct goal margin = <span className="font-semibold text-zff-black">2 pts</span>,
-            correct winner/draw only = <span className="font-semibold text-zff-black">1 pt</span>. Predictions lock at kickoff.
+            <span className="font-semibold text-zff-black">How it works:</span> predict each team&apos;s final {activeSport.unit} before
+            kickoff. Exact score = <span className="font-semibold text-zff-black">3 pts</span>, correct winner/draw + correct margin =
+            {" "}<span className="font-semibold text-zff-black">2 pts</span>, correct winner/draw only = <span className="font-semibold text-zff-black">1 pt</span>.
+            Predictions lock at kickoff.
           </div>
         </motion.div>
 
@@ -186,13 +222,13 @@ export default function PredictionsPage() {
           <div className="lg:col-span-2 space-y-4">
             <div className="glass-card p-6">
               <h2 className="text-base font-bold text-zff-black mb-5 flex items-center gap-2.5">
-                <Target className="w-4 h-4 text-zff-green" /> Upcoming Matches
+                <Target className="w-4 h-4 text-zff-green" /> Upcoming {activeSport.label} Matches
               </h2>
 
               {loading ? (
                 <p className="text-sm text-muted-foreground text-center py-8">Loading fixtures…</p>
               ) : upcoming.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">No upcoming matches to predict right now.</p>
+                <p className="text-sm text-muted-foreground text-center py-8">No upcoming {activeSport.label.toLowerCase()} matches to predict right now.</p>
               ) : (
                 <div className="space-y-3">
                   {upcoming.map((m) => {
@@ -209,18 +245,18 @@ export default function PredictionsPage() {
                         <div className="flex items-center justify-center gap-3 sm:gap-5">
                           <span className="font-semibold text-zff-black text-sm flex-1 text-right">{m.home_team}</span>
                           <input
-                            type="number" min={0} max={20} inputMode="numeric"
+                            type="number" min={0} max={999} inputMode="numeric"
                             value={draft.home}
                             onChange={(e) => setDrafts((prev) => ({ ...prev, [m.id]: { home: e.target.value, away: prev[m.id]?.away ?? "" } }))}
-                            className="input w-14 text-center px-2 py-1.5"
+                            className="input w-16 text-center px-2 py-1.5"
                             placeholder="-"
                           />
                           <span className="text-muted-foreground text-xs font-medium">—</span>
                           <input
-                            type="number" min={0} max={20} inputMode="numeric"
+                            type="number" min={0} max={999} inputMode="numeric"
                             value={draft.away}
                             onChange={(e) => setDrafts((prev) => ({ ...prev, [m.id]: { home: prev[m.id]?.home ?? "", away: e.target.value } }))}
-                            className="input w-14 text-center px-2 py-1.5"
+                            className="input w-16 text-center px-2 py-1.5"
                             placeholder="-"
                           />
                           <span className="font-semibold text-zff-black text-sm flex-1">{m.away_team}</span>
@@ -272,13 +308,13 @@ export default function PredictionsPage() {
 
           <div className="space-y-4">
             <div className="glass-card p-6 text-center">
-              <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">Your Prediction Points</p>
+              <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">Your {activeSport.label} Points</p>
               <p className="text-3xl font-display text-zff-green tracking-wider">{myTotal}</p>
             </div>
 
             <div className="glass-card p-6">
               <h2 className="text-base font-bold text-zff-black mb-4 flex items-center gap-2.5">
-                <Medal className="w-4 h-4 text-zff-green" /> Top Predictors
+                <Medal className="w-4 h-4 text-zff-green" /> Top {activeSport.label} Predictors
               </h2>
               {leaderboard.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-6">No results yet — check back after the next matchday.</p>

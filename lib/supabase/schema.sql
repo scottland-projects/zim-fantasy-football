@@ -449,8 +449,8 @@ CREATE TABLE IF NOT EXISTS score_predictions (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
   match_id UUID REFERENCES matches(id) ON DELETE CASCADE NOT NULL,
-  predicted_home_score INTEGER NOT NULL CHECK (predicted_home_score BETWEEN 0 AND 20),
-  predicted_away_score INTEGER NOT NULL CHECK (predicted_away_score BETWEEN 0 AND 20),
+  predicted_home_score INTEGER NOT NULL CHECK (predicted_home_score BETWEEN 0 AND 999),
+  predicted_away_score INTEGER NOT NULL CHECK (predicted_away_score BETWEEN 0 AND 999),
   points_earned INTEGER,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -488,7 +488,9 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'error', 'score predictions are currently disabled');
   END IF;
 
-  IF p_home_score IS NULL OR p_away_score IS NULL OR p_home_score < 0 OR p_home_score > 20 OR p_away_score < 0 OR p_away_score > 20 THEN
+  -- Upper bound is 999, not football's old 0-20 range — cricket run totals
+  -- (150-250+) and rugby point margins can both comfortably exceed 20.
+  IF p_home_score IS NULL OR p_away_score IS NULL OR p_home_score < 0 OR p_home_score > 999 OR p_away_score < 0 OR p_away_score > 999 THEN
     RETURN jsonb_build_object('ok', false, 'error', 'invalid score');
   END IF;
 
@@ -768,6 +770,86 @@ INSERT INTO matches (home_team, away_team, kickoff_time, status, matchday, seaso
   ('ZPC Kariba',      'Sugar Sugar Boyz', NOW() + INTERVAL '3 days',  'scheduled', 3, '2026'),
   ('Agama',           'Scottland',        NOW() + INTERVAL '3 days',  'scheduled', 3, '2026'),
   ('Gem Boys',        'The Punters',      NOW() + INTERVAL '3 days',  'scheduled', 3, '2026')
+ON CONFLICT DO NOTHING;
+
+-- =============================================
+-- CRICKET & RUGBY — SCORE-PREDICTIONS ONLY (2026-08-24)
+--
+-- Real Zimbabwean domestic clubs, researched via web search. Deliberately
+-- NO players/fantasy-squad tables for either sport yet — cricket has no
+-- jersey-number convention (so football's number-only anonymization can't
+-- carry over, and using real player names is a bigger legal-policy call than
+-- this pass covers) and rugby domestic club rosters aren't publicly
+-- findable at scale. Score predictions only need team-vs-team fixtures, not
+-- player rosters, so both sports work fully through the existing
+-- score_predictions / submit_score_prediction machinery with zero new
+-- backend code — see teams.sport / matches.sport above.
+--
+-- Cricket: the 5 Zimbabwe Cricket domestic franchises (Logan Cup / Pro50 /
+-- domestic T20, 2025/26 season) — stable structure, unchanged since ~2016.
+-- home_score/away_score are predicted TOTAL RUNS per team (a deliberate
+-- simplification of a full innings scorecard, consistent with common
+-- run-total prediction formats).
+--
+-- Rugby: 10 currently-active domestic club sides across the two real,
+-- separate provincial competitions — the Bulawayo Metropolitan (BMRFB)
+-- league and the Harare Province league. Kept as two separate leagues
+-- below, matching their real structure (clubs from one city don't play the
+-- other's league). home_score/away_score are match points, same as
+-- football's goals.
+-- =============================================
+
+INSERT INTO teams (name, short_name, city, primary_color, sport) VALUES
+  ('Mashonaland Eagles',   'MHE', 'Harare',     '#1D4ED8', 'cricket'),
+  ('Mid West Rhinos',      'MWR', 'Kwekwe',     '#B45309', 'cricket'),
+  ('Southern Rocks',       'SRK', 'Masvingo',   '#059669', 'cricket'),
+  ('Mountaineers',         'MTN', 'Mutare',     '#7E22CE', 'cricket'),
+  ('Matabeleland Tuskers', 'MTB', 'Bulawayo',   '#0F172A', 'cricket'),
+
+  ('Old Miltonians',            'OM',  'Bulawayo', '#0F172A', 'rugby'),
+  ('Matabeleland Warriors',     'MWA', 'Bulawayo', '#B91C1C', 'rugby'),
+  ('Western Suburbs Panthers',  'WSP', 'Bulawayo', '#1D4ED8', 'rugby'),
+  ('Mahogany Bulls',            'MHB', 'Bulawayo', '#7C2D12', 'rugby'),
+  ('Highlanders',                'HLR', 'Bulawayo', '#000000', 'rugby'),
+  ('Bulldogs',                   'BLD', 'Bulawayo', '#CA8A04', 'rugby'),
+  ('Old Georgians',              'OG',  'Harare',   '#15803D', 'rugby'),
+  ('Old Hararians',              'OH',  'Harare',   '#DC2626', 'rugby'),
+  ('Harare Sports Club',         'HSC', 'Harare',   '#0369A1', 'rugby'),
+  ('Pitbulls RFC',               'PIT', 'Harare',   '#334155', 'rugby')
+ON CONFLICT DO NOTHING;
+
+-- Cricket fixtures — 5 franchises, one bye per round.
+INSERT INTO matches (home_team, away_team, kickoff_time, status, matchday, season, sport) VALUES
+  ('Mashonaland Eagles',   'Mid West Rhinos',      NOW() + INTERVAL '2 days',  'scheduled', 1, '2026', 'cricket'),
+  ('Southern Rocks',       'Mountaineers',         NOW() + INTERVAL '2 days',  'scheduled', 1, '2026', 'cricket'),
+
+  ('Matabeleland Tuskers', 'Southern Rocks',       NOW() + INTERVAL '9 days',  'scheduled', 2, '2026', 'cricket'),
+  ('Mountaineers',         'Mashonaland Eagles',   NOW() + INTERVAL '9 days',  'scheduled', 2, '2026', 'cricket'),
+
+  ('Mid West Rhinos',      'Matabeleland Tuskers', NOW() + INTERVAL '16 days', 'scheduled', 3, '2026', 'cricket'),
+  ('Mashonaland Eagles',   'Southern Rocks',       NOW() + INTERVAL '16 days', 'scheduled', 3, '2026', 'cricket')
+ON CONFLICT DO NOTHING;
+
+-- Rugby fixtures — Bulawayo (BMRFB) and Harare Province leagues, kept
+-- separate since that's how they're actually run.
+INSERT INTO matches (home_team, away_team, kickoff_time, status, matchday, season, sport) VALUES
+  ('Old Miltonians',           'Matabeleland Warriors',    NOW() + INTERVAL '2 days',  'scheduled', 1, '2026', 'rugby'),
+  ('Western Suburbs Panthers', 'Mahogany Bulls',           NOW() + INTERVAL '2 days',  'scheduled', 1, '2026', 'rugby'),
+  ('Highlanders',              'Bulldogs',                 NOW() + INTERVAL '2 days',  'scheduled', 1, '2026', 'rugby'),
+  ('Old Georgians',            'Old Hararians',            NOW() + INTERVAL '2 days',  'scheduled', 1, '2026', 'rugby'),
+  ('Harare Sports Club',       'Pitbulls RFC',             NOW() + INTERVAL '2 days',  'scheduled', 1, '2026', 'rugby'),
+
+  ('Matabeleland Warriors',    'Western Suburbs Panthers', NOW() + INTERVAL '9 days',  'scheduled', 2, '2026', 'rugby'),
+  ('Mahogany Bulls',           'Highlanders',              NOW() + INTERVAL '9 days',  'scheduled', 2, '2026', 'rugby'),
+  ('Bulldogs',                 'Old Miltonians',           NOW() + INTERVAL '9 days',  'scheduled', 2, '2026', 'rugby'),
+  ('Old Hararians',            'Harare Sports Club',       NOW() + INTERVAL '9 days',  'scheduled', 2, '2026', 'rugby'),
+  ('Pitbulls RFC',             'Old Georgians',            NOW() + INTERVAL '9 days',  'scheduled', 2, '2026', 'rugby'),
+
+  ('Old Miltonians',           'Mahogany Bulls',           NOW() + INTERVAL '16 days', 'scheduled', 3, '2026', 'rugby'),
+  ('Highlanders',              'Matabeleland Warriors',    NOW() + INTERVAL '16 days', 'scheduled', 3, '2026', 'rugby'),
+  ('Bulldogs',                 'Western Suburbs Panthers', NOW() + INTERVAL '16 days', 'scheduled', 3, '2026', 'rugby'),
+  ('Old Georgians',            'Harare Sports Club',       NOW() + INTERVAL '16 days', 'scheduled', 3, '2026', 'rugby'),
+  ('Old Hararians',            'Pitbulls RFC',             NOW() + INTERVAL '16 days', 'scheduled', 3, '2026', 'rugby')
 ON CONFLICT DO NOTHING;
 
 -- =============================================

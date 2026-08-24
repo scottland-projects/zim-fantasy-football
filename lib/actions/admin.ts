@@ -134,11 +134,15 @@ export async function saveFixtureAction(form: {
   matchday: string;
   kickoff: string;
   season: string;
+  sport?: "football" | "cricket" | "rugby";
 }) {
   if (!form.away?.trim() || !form.matchday || !form.kickoff) return { error: "Missing required fields", data: null };
 
   const matchday = parseInt(form.matchday);
   if (isNaN(matchday) || matchday < 1 || matchday > 500) return { error: "Invalid matchday", data: null };
+
+  const VALID_SPORTS = ["football", "cricket", "rugby"];
+  const sport = VALID_SPORTS.includes(form.sport ?? "") ? form.sport! : "football";
 
   const { error, supabase } = await requireAdmin();
   if (error || !supabase) return { error: error ?? "Unknown error", data: null };
@@ -150,12 +154,57 @@ export async function saveFixtureAction(form: {
     kickoff_time: form.kickoff,
     season: form.season.trim().slice(0, 20),
     status: "scheduled",
-    sport: "football",
+    sport,
   }).select().single();
 
   if (dbError) return { error: dbError.message, data: null };
   revalidatePath("/admin");
   return { error: null, data };
+}
+
+// Cricket/rugby matches only carry a final score for score-predictions —
+// there's no player-stats-driven scoring engine for those sports (see
+// schema.sql's "CRICKET & RUGBY — SCORE-PREDICTIONS ONLY" section), so this
+// is a lightweight counterpart to saveMatchStatsAction that just records the
+// result and scores predictions, without touching player_match_stats or the
+// fantasy-points recalculation (which only exists for football).
+export async function finishPredictionOnlyMatchAction(matchId: string, homeScore: number, awayScore: number) {
+  if (!Number.isInteger(homeScore) || !Number.isInteger(awayScore) || homeScore < 0 || awayScore < 0 || homeScore > 999 || awayScore > 999) {
+    return { error: "Invalid score" };
+  }
+
+  const { error, supabase } = await requireAdmin();
+  if (error || !supabase) return { error: error ?? "Unknown error" };
+
+  const { data: match } = await supabase.from("matches").select("sport").eq("id", matchId).single();
+  if (!match) return { error: "Match not found" };
+  if (match.sport === "football") return { error: "Football matches must be finished via the Stats form" };
+
+  await supabase.from("matches").update({
+    status: "finished",
+    home_score: homeScore,
+    away_score: awayScore,
+  }).eq("id", matchId);
+
+  await supabase.rpc("score_predictions_for_match", { p_match_id: matchId });
+
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+export async function reopenPredictionOnlyMatchAction(matchId: string) {
+  const { error, supabase } = await requireAdminOrManager();
+  if (error || !supabase) return { error: error ?? "Unknown error" };
+
+  const { data: match } = await supabase.from("matches").select("sport").eq("id", matchId).single();
+  if (!match) return { error: "Match not found" };
+  if (match.sport === "football") return { error: "Football matches must be reopened via the football flow" };
+
+  await supabase.rpc("reverse_predictions_for_match", { p_match_id: matchId });
+  await supabase.from("matches").update({ status: "scheduled", home_score: null, away_score: null }).eq("id", matchId);
+
+  revalidatePath("/admin");
+  return { success: true };
 }
 
 export async function saveMatchStatsAction(

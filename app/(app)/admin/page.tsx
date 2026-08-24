@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { saveFlagsAction, updateMatchStatusAction, cancelMatchLiveAction, saveFixtureAction, saveMatchStatsAction, savePrizesAction, updateUserRoleAction, broadcastNotificationAction, addPlayerAction, editPlayerAction, deletePlayerAction, adminResetPasswordAction, logMatchEventAction, deleteMatchEventAction, reopenMatchAction, listUserEmailsAction } from "@/lib/actions/admin";
+import { saveFlagsAction, updateMatchStatusAction, cancelMatchLiveAction, saveFixtureAction, saveMatchStatsAction, savePrizesAction, updateUserRoleAction, broadcastNotificationAction, addPlayerAction, editPlayerAction, deletePlayerAction, adminResetPasswordAction, logMatchEventAction, deleteMatchEventAction, reopenMatchAction, listUserEmailsAction, finishPredictionOnlyMatchAction, reopenPredictionOnlyMatchAction } from "@/lib/actions/admin";
 import { deleteLeagueAction } from "@/lib/actions/leagues";
 import { motion, AnimatePresence } from "framer-motion";
 import { TopBar } from "@/components/layout/TopBar";
@@ -23,6 +23,7 @@ interface AdminMatch {
   status: string;
   matchday: number;
   season: string;
+  sport: "football" | "cricket" | "rugby";
 }
 
 interface PlayerStatRow {
@@ -95,7 +96,7 @@ export default function AdminPage() {
         }
 
         // Matches
-        const { data: matchesData } = await supabase.from("matches").select("*").eq("sport", "football").order("matchday", { ascending: false });
+        const { data: matchesData } = await supabase.from("matches").select("*").order("matchday", { ascending: false });
         if (matchesData && matchesData.length > 0) setDbMatches(matchesData as AdminMatch[]);
 
         // Public leagues for prize management
@@ -165,8 +166,12 @@ export default function AdminPage() {
   const [calculating, setCalculating] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
   const [addFixtureOpen, setAddFixtureOpen] = useState(false);
-  const [fixtureForm, setFixtureForm] = useState({ home: "", away: "", matchday: "", kickoff: "", season: "2026" });
+  const [fixtureForm, setFixtureForm] = useState<{ home: string; away: string; matchday: string; kickoff: string; season: string; sport: "football" | "cricket" | "rugby" }>({ home: "", away: "", matchday: "", kickoff: "", season: "2026", sport: "football" });
   const [savingFixture, setSavingFixture] = useState(false);
+  const [matchSportTab, setMatchSportTab] = useState<"football" | "cricket" | "rugby">("football");
+  const [scoreEntryMatch, setScoreEntryMatch] = useState<string | null>(null);
+  const [scoreEntryForm, setScoreEntryForm] = useState({ home: "", away: "" });
+  const [scoreEntrySaving, setScoreEntrySaving] = useState(false);
   // ── Live Scoring ─────────────────────────────────────────────────────────
   const [liveScoreMatch, setLiveScoreMatch] = useState<AdminMatch | null>(null);
   const [liveEvents, setLiveEvents] = useState<{ id: string; minute: number; event_type: string; side: string; player_name: string }[]>([]);
@@ -421,10 +426,37 @@ export default function AdminPage() {
       if (result.error) { showToast("error", result.error); return; }
       if (result.data) setDbMatches(prev => [result.data as AdminMatch, ...prev].sort((a, b) => b.matchday - a.matchday));
       setAddFixtureOpen(false);
-      setFixtureForm({ home: "", away: "", matchday: "", kickoff: "", season: "2026" });
+      setFixtureForm({ home: "", away: "", matchday: "", kickoff: "", season: "2026", sport: matchSportTab });
       showToast("success", "Fixture added");
     } catch { showToast("error", "Failed to save fixture"); }
     finally { setSavingFixture(false); }
+  }
+
+  async function saveScoreEntry(matchId: string) {
+    const home = parseInt(scoreEntryForm.home, 10);
+    const away = parseInt(scoreEntryForm.away, 10);
+    if (isNaN(home) || isNaN(away) || home < 0 || away < 0) { showToast("error", "Enter a valid score for both teams"); return; }
+    setScoreEntrySaving(true);
+    try {
+      const result = await finishPredictionOnlyMatchAction(matchId, home, away);
+      if (result.error) { showToast("error", result.error); return; }
+      setDbMatches(prev => prev.map(m => m.id === matchId ? { ...m, status: "finished", home_score: home, away_score: away } : m));
+      setScoreEntryMatch(null);
+      setScoreEntryForm({ home: "", away: "" });
+      showToast("success", "Result saved and predictions scored");
+    } catch { showToast("error", "Failed to save result"); }
+    finally { setScoreEntrySaving(false); }
+  }
+
+  async function reopenNonFootballMatch(matchId: string) {
+    setStatusUpdating(matchId);
+    try {
+      const result = await reopenPredictionOnlyMatchAction(matchId);
+      if (result.error) { showToast("error", result.error); return; }
+      setDbMatches(prev => prev.map(m => m.id === matchId ? { ...m, status: "scheduled", home_score: null, away_score: null } : m));
+      showToast("success", "Match reopened");
+    } catch { showToast("error", "Failed to reopen match"); }
+    finally { setStatusUpdating(null); }
   }
 
   async function savePrizes(leagueId: string) {
@@ -971,19 +1003,42 @@ export default function AdminPage() {
                 <div className="flex items-center justify-between p-5 border-b border-slate-200">
                   <div className="min-w-0">
                     <h2 className="font-bold text-zff-black">Fixture Management</h2>
-                    <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">Set match status and enter player stats to calculate fantasy points</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">Football: set status and enter player stats. Cricket/Rugby: enter a final score to score predictions.</p>
                   </div>
-                  <button onClick={() => setAddFixtureOpen(true)} className="btn-primary text-xs py-2 px-3 flex items-center gap-1.5 shrink-0">
+                  <button onClick={() => { setFixtureForm(p => ({ ...p, sport: matchSportTab })); setAddFixtureOpen(true); }} className="btn-primary text-xs py-2 px-3 flex items-center gap-1.5 shrink-0">
                     <Plus className="w-3 h-3" /> Add Fixture
                   </button>
+                </div>
+
+                <div className="flex gap-2 px-5 pt-4">
+                  {(["football", "cricket", "rugby"] as const).map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setMatchSportTab(s)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg text-xs font-semibold border capitalize transition-colors",
+                        matchSportTab === s ? "bg-zff-green text-white border-zff-green" : "bg-white text-slate-500 border-slate-200 hover:border-zff-green/40"
+                      )}
+                    >
+                      {s}
+                    </button>
+                  ))}
                 </div>
 
                 {/* Add fixture form */}
                 <AnimatePresence>
                   {addFixtureOpen && (
                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-                      className="border-b border-slate-200 bg-slate-50 overflow-hidden">
+                      className="border-b border-slate-200 bg-slate-50 overflow-hidden mt-4">
                       <div className="p-5 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Sport *</label>
+                          <select value={fixtureForm.sport} onChange={e => setFixtureForm(p => ({ ...p, sport: e.target.value as typeof p.sport }))} className="input text-sm py-2 capitalize">
+                            <option value="football">Football</option>
+                            <option value="cricket">Cricket</option>
+                            <option value="rugby">Rugby</option>
+                          </select>
+                        </div>
                         <div>
                           <label className="text-xs font-medium text-muted-foreground mb-1 block">Home Team *</label>
                           <input value={fixtureForm.home} onChange={e => setFixtureForm(p => ({ ...p, home: e.target.value }))} placeholder="e.g. Bosso" className="input text-sm py-2" />
@@ -1016,10 +1071,11 @@ export default function AdminPage() {
                 </AnimatePresence>
 
                 <div className="divide-y divide-slate-100">
-                  {dbMatches.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-10">No matches found</p>
-                  ) : dbMatches.map((m) => (
-                    <div key={m.id} className="flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-3 sm:py-4 hover:bg-slate-50/50 transition-colors">
+                  {dbMatches.filter(m => (m.sport ?? "football") === matchSportTab).length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-10">No {matchSportTab} matches found</p>
+                  ) : dbMatches.filter(m => (m.sport ?? "football") === matchSportTab).map((m) => (
+                    <div key={m.id} className="px-3 sm:px-5 py-3 sm:py-4 hover:bg-slate-50/50 transition-colors">
+                    <div className="flex items-center gap-2 sm:gap-4">
                       {/* Matchday + date */}
                       <div className="w-14 sm:w-24 shrink-0">
                         <p className="text-xs font-bold text-zff-green">MD{m.matchday}</p>
@@ -1051,42 +1107,75 @@ export default function AdminPage() {
 
                       {/* Actions */}
                       <div className="shrink-0">
-                        {m.status === "scheduled" && (
-                          <button onClick={() => updateMatchStatus(m.id, "live")} disabled={statusUpdating === m.id}
-                            className="text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 hover:bg-red-500/20 transition-colors disabled:opacity-50 whitespace-nowrap">
-                            {statusUpdating === m.id ? "…" : "▶ Live"}
-                          </button>
-                        )}
-                        {m.status === "live" && (
-                          <div className="flex items-center gap-1.5">
-                            <button onClick={() => openLiveScoring(m)}
-                              className="text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 hover:bg-red-500/20 transition-colors flex items-center gap-1 whitespace-nowrap">
-                              <Zap className="w-3 h-3" /> Live
-                            </button>
-                            <button onClick={() => openScoring(m)}
-                              className="text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-lg bg-zff-green/10 border border-zff-green/30 text-zff-green hover:bg-zff-green/20 transition-colors flex items-center gap-1 whitespace-nowrap">
-                              <Edit className="w-3 h-3" /> Stats
-                            </button>
-                            <button
-                              onClick={async () => {
-                                setStatusUpdating(m.id);
-                                try { await cancelMatchLiveAction(m.id); setDbMatches(prev => prev.map(x => x.id === m.id ? { ...x, status: "scheduled" } : x)); }
-                                finally { setStatusUpdating(null); }
-                              }}
-                              disabled={statusUpdating === m.id}
-                              className="text-[10px] font-bold px-2 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-muted-foreground hover:border-red-400/40 hover:text-red-400 transition-colors whitespace-nowrap disabled:opacity-50"
-                              title="Cancel live — reverts status and removes notifications">
-                              ✕
-                            </button>
-                          </div>
-                        )}
-                        {m.status === "finished" && (
-                          <button onClick={() => openScoring(m)}
-                            className="text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-lg border border-slate-200 text-muted-foreground hover:border-zff-green/30 hover:text-zff-green transition-colors flex items-center gap-1 whitespace-nowrap">
-                            <Edit className="w-3 h-3" /> Edit
-                          </button>
+                        {m.sport !== "football" ? (
+                          <>
+                            {m.status === "scheduled" && (
+                              <button onClick={() => { setScoreEntryMatch(scoreEntryMatch === m.id ? null : m.id); setScoreEntryForm({ home: "", away: "" }); }}
+                                className="text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-lg bg-zff-green/10 border border-zff-green/30 text-zff-green hover:bg-zff-green/20 transition-colors flex items-center gap-1 whitespace-nowrap">
+                                <Edit className="w-3 h-3" /> Enter Score
+                              </button>
+                            )}
+                            {m.status === "finished" && (
+                              <button onClick={() => reopenNonFootballMatch(m.id)} disabled={statusUpdating === m.id}
+                                className="text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-lg border border-slate-200 text-muted-foreground hover:border-amber-400/40 hover:text-amber-500 transition-colors whitespace-nowrap disabled:opacity-50">
+                                {statusUpdating === m.id ? "…" : "Reopen"}
+                              </button>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {m.status === "scheduled" && (
+                              <button onClick={() => updateMatchStatus(m.id, "live")} disabled={statusUpdating === m.id}
+                                className="text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 hover:bg-red-500/20 transition-colors disabled:opacity-50 whitespace-nowrap">
+                                {statusUpdating === m.id ? "…" : "▶ Live"}
+                              </button>
+                            )}
+                            {m.status === "live" && (
+                              <div className="flex items-center gap-1.5">
+                                <button onClick={() => openLiveScoring(m)}
+                                  className="text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 hover:bg-red-500/20 transition-colors flex items-center gap-1 whitespace-nowrap">
+                                  <Zap className="w-3 h-3" /> Live
+                                </button>
+                                <button onClick={() => openScoring(m)}
+                                  className="text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-lg bg-zff-green/10 border border-zff-green/30 text-zff-green hover:bg-zff-green/20 transition-colors flex items-center gap-1 whitespace-nowrap">
+                                  <Edit className="w-3 h-3" /> Stats
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    setStatusUpdating(m.id);
+                                    try { await cancelMatchLiveAction(m.id); setDbMatches(prev => prev.map(x => x.id === m.id ? { ...x, status: "scheduled" } : x)); }
+                                    finally { setStatusUpdating(null); }
+                                  }}
+                                  disabled={statusUpdating === m.id}
+                                  className="text-[10px] font-bold px-2 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-muted-foreground hover:border-red-400/40 hover:text-red-400 transition-colors whitespace-nowrap disabled:opacity-50"
+                                  title="Cancel live — reverts status and removes notifications">
+                                  ✕
+                                </button>
+                              </div>
+                            )}
+                            {m.status === "finished" && (
+                              <button onClick={() => openScoring(m)}
+                                className="text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-lg border border-slate-200 text-muted-foreground hover:border-zff-green/30 hover:text-zff-green transition-colors flex items-center gap-1 whitespace-nowrap">
+                                <Edit className="w-3 h-3" /> Edit
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
+                    </div>
+                    {scoreEntryMatch === m.id && (
+                      <div className="mt-3 flex items-center gap-2 justify-center bg-slate-50 border border-slate-200 rounded-lg p-3">
+                        <span className="text-xs text-muted-foreground truncate max-w-[80px] text-right">{m.home_team}</span>
+                        <input type="number" min={0} value={scoreEntryForm.home} onChange={e => setScoreEntryForm(p => ({ ...p, home: e.target.value }))} className="input w-16 text-center px-2 py-1.5 text-sm" placeholder="-" />
+                        <span className="text-muted-foreground text-xs">—</span>
+                        <input type="number" min={0} value={scoreEntryForm.away} onChange={e => setScoreEntryForm(p => ({ ...p, away: e.target.value }))} className="input w-16 text-center px-2 py-1.5 text-sm" placeholder="-" />
+                        <span className="text-xs text-muted-foreground truncate max-w-[80px]">{m.away_team}</span>
+                        <button onClick={() => saveScoreEntry(m.id)} disabled={scoreEntrySaving} className="btn-primary text-xs py-1.5 px-3 ml-2 disabled:opacity-60">
+                          {scoreEntrySaving ? "Saving…" : "Finish"}
+                        </button>
+                        <button onClick={() => setScoreEntryMatch(null)} className="text-xs text-muted-foreground hover:text-zff-black px-2">Cancel</button>
+                      </div>
+                    )}
                     </div>
                   ))}
                 </div>
