@@ -1490,7 +1490,9 @@ REVOKE EXECUTE ON FUNCTION buy_player(UUID) FROM PUBLIC, anon;
 -- SOUTH AFRICA & BOTSWANA EXPANSION (2026-08-25)
 --
 -- See supabase/migrations/20260825040000_add_south_africa_botswana_teams.sql
--- for full sourcing/confidence notes. Adds a `country` dimension to
+-- and 20260825050000_verify_south_africa_botswana_team_details.sql (a
+-- follow-up social-media verification pass that filled in most remaining
+-- colour/nickname gaps below) for full sourcing/confidence notes. Adds a `country` dimension to
 -- teams/matches (previously implicit — every team was Zimbabwean) and
 -- seeds real, web-verified clubs for South Africa (football, cricket,
 -- rugby) and Botswana (football, rugby). Botswana cricket is excluded —
@@ -1506,19 +1508,19 @@ INSERT INTO teams (name, nickname, short_name, city, primary_color, sport, count
   ('Kaizer Chiefs FC',            'Amakhosi',                 'KZC',  'Johannesburg', '#FFC72C', 'football', 'South Africa', 'Betway Premiership'),
   ('Orlando Pirates FC',          'Bucs',                     'ORL',  'Johannesburg', '#1A1A1A', 'football', 'South Africa', 'Betway Premiership'),
   ('Mamelodi Sundowns FC',        'The Brazilians',           'SUN',  'Pretoria',     '#FFD400', 'football', 'South Africa', 'Betway Premiership'),
-  ('AmaZulu FC',                  NULL,                       'AMA',  'Durban',       NULL,      'football', 'South Africa', 'Betway Premiership'),
-  ('Lamontville Golden Arrows FC', 'Abafana Bes''thende',     'ARR',  'Durban',       NULL,      'football', 'South Africa', 'Betway Premiership'),
+  ('AmaZulu FC',                  'Usuthu',                   'AMA',  'Durban',       '#046A38', 'football', 'South Africa', 'Betway Premiership'),
+  ('Lamontville Golden Arrows FC', 'Abafana Bes''thende',     'ARR',  'Durban',       '#D4AF37', 'football', 'South Africa', 'Betway Premiership'),
   ('Chippa United FC',            'Chilli Boys',              'CHP',  'East London',  NULL,      'football', 'South Africa', 'Betway Premiership'),
   ('Sekhukhune United FC',        'Babina Noko',              'SEK',  'Polokwane',    NULL,      'football', 'South Africa', 'Betway Premiership'),
   ('TS Galaxy FC',                'The Rockets',              'TSG',  'Mbombela',     NULL,      'football', 'South Africa', 'Betway Premiership'),
-  ('Durban City FC',              NULL,                       'DBC',  'Durban',       NULL,      'football', 'South Africa', 'Betway Premiership'),
-  ('Marumo Gallants FC',          NULL,                       'MAR',  'Bloemfontein', NULL,      'football', 'South Africa', 'Betway Premiership'),
-  ('Polokwane City FC',           NULL,                       'PLK',  'Polokwane',    NULL,      'football', 'South Africa', 'Betway Premiership'),
-  ('Richards Bay FC',             NULL,                       'RIC',  'Richards Bay', NULL,      'football', 'South Africa', 'Betway Premiership'),
-  ('Siwelele FC',                 NULL,                       'SIW',  'Bloemfontein', NULL,      'football', 'South Africa', 'Betway Premiership'),
-  ('Stellenbosch FC',             NULL,                       'STE',  'Stellenbosch', NULL,      'football', 'South Africa', 'Betway Premiership'),
-  ('Milford FC',                  NULL,                       'MIL',  'Richards Bay', NULL,      'football', 'South Africa', 'Betway Premiership'),
-  ('Kruger United FC',            NULL,                       'KRU',  'KaNyamazane',  NULL,      'football', 'South Africa', 'Betway Premiership')
+  ('Durban City FC',              'Citizens',                 'DBC',  'Durban',       '#0057B8', 'football', 'South Africa', 'Betway Premiership'),
+  ('Marumo Gallants FC',          'Bahlabane Ba Ntwa',        'MAR',  'Bloemfontein', '#32CD32', 'football', 'South Africa', 'Betway Premiership'),
+  ('Polokwane City FC',           'Rise and Shine',           'PLK',  'Polokwane',    '#F26522', 'football', 'South Africa', 'Betway Premiership'),
+  ('Richards Bay FC',             'Natal Rich Boys',          'RIC',  'Richards Bay', '#001F5B', 'football', 'South Africa', 'Betway Premiership'),
+  ('Siwelele FC',                 NULL,                       'SIW',  'Bloemfontein', '#1E7A34', 'football', 'South Africa', 'Betway Premiership'),
+  ('Stellenbosch FC',             'Stellies',                 'STE',  'Stellenbosch', '#800000', 'football', 'South Africa', 'Betway Premiership'),
+  ('Milford FC',                  'Stallions',                'MIL',  'Richards Bay', '#D32F2F', 'football', 'South Africa', 'Betway Premiership'),
+  ('Kruger United FC',            'The Village Boys',         'KRU',  'KaNyamazane',  '#006CBF', 'football', 'South Africa', 'Betway Premiership')
 ON CONFLICT DO NOTHING;
 
 -- South Africa — cricket (CSA 4-Day Series, Division One)
@@ -1530,7 +1532,7 @@ INSERT INTO teams (name, nickname, short_name, city, primary_color, sport, count
   ('Western Province',      'Boys in Blue', 'WP', 'Cape Town',     '#0033A0', 'cricket', 'South Africa', 'CSA 4-Day Series (Division One)'),
   ('Boland',                NULL,     'BOL',  'Paarl',             NULL,      'cricket', 'South Africa', 'CSA 4-Day Series (Division One)'),
   ('North West',            'Dragons', 'NW',  'Potchefstroom',     NULL,      'cricket', 'South Africa', 'CSA 4-Day Series (Division One)'),
-  ('KwaZulu-Natal Inland',  'Tuskers', 'KZNI', 'Pietermaritzburg', NULL,      'cricket', 'South Africa', 'CSA 4-Day Series (Division One)')
+  ('KwaZulu-Natal Inland',  'Tuskers', 'KZNI', 'Pietermaritzburg', '#1B263B', 'cricket', 'South Africa', 'CSA 4-Day Series (Division One)')
 ON CONFLICT DO NOTHING;
 
 -- South Africa — rugby (Currie Cup, 14 first-class provincial unions)
@@ -1543,32 +1545,32 @@ INSERT INTO teams (name, nickname, short_name, city, primary_color, sport, count
   ('Griquas',           'Peacock Blues',    'GRQ', 'Kimberley',     '#002F6C', 'rugby', 'South Africa', 'Currie Cup'),
   ('Pumas',             NULL,               'PUM', 'Mbombela',      '#FFC72C', 'rugby', 'South Africa', 'Currie Cup'),
   ('Boland Cavaliers',  NULL,               'BOC', 'Wellington',    '#F26522', 'rugby', 'South Africa', 'Currie Cup'),
-  ('Griffons',          NULL,               'GRI', 'Welkom',        NULL,      'rugby', 'South Africa', 'Currie Cup'),
+  ('Griffons',          NULL,               'GRI', 'Welkom',        '#6A0DAD', 'rugby', 'South Africa', 'Currie Cup'),
   ('Border Bulldogs',   NULL,               'BOR', 'East London',   NULL,      'rugby', 'South Africa', 'Currie Cup'),
-  ('Eastern Province',  'Elephants',        'EP',  'Gqeberha',      NULL,      'rugby', 'South Africa', 'Currie Cup'),
-  ('SWD Eagles',        NULL,               'SWD', 'George',        NULL,      'rugby', 'South Africa', 'Currie Cup'),
+  ('Eastern Province',  'Elephants',        'EP',  'Gqeberha',      '#B22222', 'rugby', 'South Africa', 'Currie Cup'),
+  ('SWD Eagles',        NULL,               'SWD', 'George',        '#003DA5', 'rugby', 'South Africa', 'Currie Cup'),
   ('Valke',              NULL,               'VAL', 'Kempton Park',  NULL,      'rugby', 'South Africa', 'Currie Cup'),
-  ('Leopards',           NULL,               'LEO', 'Potchefstroom', NULL,      'rugby', 'South Africa', 'Currie Cup')
+  ('Leopards',           NULL,               'LEO', 'Potchefstroom', '#2E7D32', 'rugby', 'South Africa', 'Currie Cup')
 ON CONFLICT DO NOTHING;
 
 -- Botswana — football (FNB Botswana Premier League, 2026-27 roster)
 INSERT INTO teams (name, nickname, short_name, city, primary_color, sport, country, competition) VALUES
   ('Township Rollers FC',    'Popa',              'TRO', 'Gaborone',      '#0033A0', 'football', 'Botswana', 'FNB Botswana Premier League'),
-  ('Gaborone United SC',     'Moyagoleele',       'GU',  'Gaborone',      NULL,      'football', 'Botswana', 'FNB Botswana Premier League'),
+  ('Gaborone United SC',     'Moyagoleele',       'GU',  'Gaborone',      '#EE0000', 'football', 'Botswana', 'FNB Botswana Premier League'),
   ('Mochudi Centre Chiefs SC', 'Magosi',          'MCC', 'Mochudi',       '#1A1A1A', 'football', 'Botswana', 'FNB Botswana Premier League'),
   ('Morupule Wanderers FC',  'Bafana ba Magala',  'MOR', 'Palapye',       '#87CEEB', 'football', 'Botswana', 'FNB Botswana Premier League'),
-  ('Nico United',            'Majombolo',         'NIC', 'Selebi-Phikwe', NULL,      'football', 'Botswana', 'FNB Botswana Premier League'),
+  ('Nico United',            'Majombolo',         'NIC', 'Selebi-Phikwe', '#3CB043', 'football', 'Botswana', 'FNB Botswana Premier League'),
   ('Orapa United FC',        'The Ostriches',     'ORA', 'Orapa',         '#F26522', 'football', 'Botswana', 'FNB Botswana Premier League'),
-  ('Botswana Police XI SC',  'The Jungle Kings',  'POL', 'Otse',          NULL,      'football', 'Botswana', 'FNB Botswana Premier League'),
+  ('Botswana Police XI SC',  'The Jungle Kings',  'POL', 'Otse',          '#FF0022', 'football', 'Botswana', 'FNB Botswana Premier League'),
   ('Sua Flamingoes FC',      NULL,                'SUA', 'Sowa',          '#FF69B4', 'football', 'Botswana', 'FNB Botswana Premier League'),
   ('TAFIC FC',               'Matjimenyenga',     'TAF', 'Francistown',   NULL,      'football', 'Botswana', 'FNB Botswana Premier League'),
-  ('BDF XI',                 NULL,                'BDF', 'Gaborone',      NULL,      'football', 'Botswana', 'FNB Botswana Premier League'),
-  ('Extension Gunners FC',   NULL,                'EXT', 'Lobatse',       '#1A1A1A', 'football', 'Botswana', 'FNB Botswana Premier League'),
-  ('Jwaneng Galaxy FC',      NULL,                'JWG', 'Jwaneng',       NULL,      'football', 'Botswana', 'FNB Botswana Premier League'),
-  ('Matebele FC',            NULL,                'MAT', 'Matebeleng',    NULL,      'football', 'Botswana', 'FNB Botswana Premier League'),
+  ('BDF XI',                 NULL,                'BDF', 'Gaborone',      '#2E7D32', 'football', 'Botswana', 'FNB Botswana Premier League'),
+  ('Extension Gunners FC',   'Mapantsula',        'EXT', 'Lobatse',       '#1A1A1A', 'football', 'Botswana', 'FNB Botswana Premier League'),
+  ('Jwaneng Galaxy FC',      NULL,                'JWG', 'Jwaneng',       '#EE0000', 'football', 'Botswana', 'FNB Botswana Premier League'),
+  ('Matebele FC',            'Kuka Ntsu',         'MAT', 'Matebeleng',    NULL,      'football', 'Botswana', 'FNB Botswana Premier League'),
   ('Enesia FC',              NULL,                'ENE', 'Francistown',   NULL,      'football', 'Botswana', 'FNB Botswana Premier League'),
   ('Prisons XI Gaborone',    'The Warders',       'PRI', 'Gaborone',      NULL,      'football', 'Botswana', 'FNB Botswana Premier League'),
-  ('Tonota FC',              NULL,                'TON', 'Tonota',        NULL,      'football', 'Botswana', 'FNB Botswana Premier League')
+  ('Tonota FC',              'Sepondo se a Debola', 'TON', 'Tonota',      NULL,      'football', 'Botswana', 'FNB Botswana Premier League')
 ON CONFLICT DO NOTHING;
 
 -- Botswana — rugby (Botswana Super Rugby League, 7 corroborated clubs)
@@ -1578,7 +1580,7 @@ INSERT INTO teams (name, nickname, short_name, city, primary_color, sport, count
   ('Botho University Ryders',             NULL,      'BUR',  'Gaborone', NULL, 'rugby', 'Botswana', 'Botswana Super Rugby League'),
   ('Botswana Defence Force Rugby Club',   'Cheetahs', 'BDFR', 'Gaborone', NULL, 'rugby', 'Botswana', 'Botswana Super Rugby League'),
   ('University of Botswana Rugby Club',   'Rhinos',  'UBR',  'Gaborone', NULL, 'rugby', 'Botswana', 'Botswana Super Rugby League'),
-  ('BIUST Buffalos',                      NULL,      'BIU',  'Palapye',  NULL, 'rugby', 'Botswana', 'Botswana Super Rugby League'),
+  ('BIUST Buffalos',                      NULL,      'BIU',  'Palapye',  '#F26522', 'rugby', 'Botswana', 'Botswana Super Rugby League'),
   ('Jwaneng Wildebeests',                 NULL,      'JWB',  'Jwaneng',  NULL, 'rugby', 'Botswana', 'Botswana Super Rugby League')
 ON CONFLICT DO NOTHING;
 
