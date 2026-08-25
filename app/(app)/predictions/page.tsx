@@ -11,12 +11,23 @@ import { FeatureDisabled } from "@/components/ui/FeatureDisabled";
 import { useSearchParams } from "next/navigation";
 
 type Sport = "football" | "cricket" | "rugby";
+type Country = "Zimbabwe" | "South Africa" | "Botswana";
 
 const SPORTS: { id: Sport; label: string; unit: string; icon: typeof Target }[] = [
   { id: "football", label: "Football", unit: "goals", icon: Target },
   { id: "cricket",  label: "Cricket",  unit: "total runs", icon: Circle },
   { id: "rugby",    label: "Rugby",    unit: "points", icon: Trophy },
 ];
+
+// Which countries have seeded teams for each sport — Botswana has no
+// domestic cricket league to seed (see the migration's sourcing notes).
+const COUNTRIES_BY_SPORT: Record<Sport, Country[]> = {
+  football: ["Zimbabwe", "South Africa", "Botswana"],
+  cricket:  ["Zimbabwe", "South Africa"],
+  rugby:    ["Zimbabwe", "South Africa", "Botswana"],
+};
+
+const COUNTRY_FLAGS: Record<Country, string> = { Zimbabwe: "🇿🇼", "South Africa": "🇿🇦", Botswana: "🇧🇼" };
 
 interface UpcomingMatch {
   id: string;
@@ -70,6 +81,13 @@ function PredictionsPageContent() {
     const fromUrl = searchParams.get("sport");
     return (fromUrl === "cricket" || fromUrl === "rugby" || fromUrl === "football") ? fromUrl : "football";
   });
+  const [country, setCountry] = useState<Country>("Zimbabwe");
+  // A country not seeded for the newly-picked sport (e.g. Botswana cricket)
+  // falls back to Zimbabwe rather than loading an empty list.
+  function changeSport(s: Sport) {
+    setSport(s);
+    if (!COUNTRIES_BY_SPORT[s].includes(country)) setCountry("Zimbabwe");
+  }
   const [season, setSeason] = useState<string | null>(null);
   const [upcoming, setUpcoming] = useState<UpcomingMatch[]>([]);
   const [drafts, setDrafts] = useState<Record<string, { home: string; away: string }>>({});
@@ -123,7 +141,7 @@ function PredictionsPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const load = useCallback(async (forSport: Sport, forScope: string) => {
+  const load = useCallback(async (forSport: Sport, forScope: string, forCountry: Country) => {
     setLoading(true);
     const supabase = createClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -136,6 +154,7 @@ function PredictionsPageContent() {
       .from("matches")
       .select("id, home_team, away_team, kickoff_time, matchday, status, home_score, away_score, season")
       .eq("sport", forSport)
+      .eq("country", forCountry)
       .order("kickoff_time", { ascending: true });
 
     const allMatchesRaw = sportMatches ?? [];
@@ -272,7 +291,7 @@ function PredictionsPageContent() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(sport, scopeId); }, [sport, scopeId, load]);
+  useEffect(() => { load(sport, scopeId, country); }, [sport, scopeId, country, load]);
 
   async function submit(matchId: string) {
     const draft = drafts[matchId];
@@ -314,7 +333,7 @@ function PredictionsPageContent() {
           {SPORTS.map((s) => (
             <button
               key={s.id}
-              onClick={() => setSport(s.id)}
+              onClick={() => changeSport(s.id)}
               className={cn(
                 "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border transition-colors",
                 sport === s.id ? "bg-zff-green text-white border-zff-green" : "bg-white text-slate-500 border-slate-200 hover:border-zff-green/40"
@@ -324,6 +343,23 @@ function PredictionsPageContent() {
             </button>
           ))}
         </div>
+
+        {COUNTRIES_BY_SPORT[sport].length > 1 && (
+          <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
+            {COUNTRIES_BY_SPORT[sport].map((c) => (
+              <button
+                key={c}
+                onClick={() => setCountry(c)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5",
+                  country === c ? "bg-white text-zff-black shadow-sm" : "text-muted-foreground hover:text-zff-black"
+                )}
+              >
+                <span>{COUNTRY_FLAGS[c]}</span> {c}
+              </button>
+            ))}
+          </div>
+        )}
 
         <motion.div key={sport} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-5 flex items-start gap-3">
           <div className="p-2 rounded-xl bg-zff-green/10 border border-zff-green/20 shrink-0">
@@ -341,7 +377,7 @@ function PredictionsPageContent() {
           <div className="lg:col-span-2 space-y-4">
             <div className="glass-card p-6">
               <h2 className="text-base font-bold text-zff-black mb-5 flex items-center gap-2.5">
-                <Target className="w-4 h-4 text-zff-green" /> Upcoming {activeSport.label} Matches
+                <Target className="w-4 h-4 text-zff-green" /> Upcoming {country !== "Zimbabwe" ? `${country} ` : ""}{activeSport.label} Matches
               </h2>
 
               {loading ? (

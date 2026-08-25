@@ -8,12 +8,24 @@ import { createClient } from "@/lib/supabase/client";
 import { cn, getPositionColor } from "@/lib/utils";
 
 type Sport = "football" | "cricket" | "rugby";
+type Country = "Zimbabwe" | "South Africa" | "Botswana";
 
 const SPORT_TABS: { id: Sport; label: string; emoji: string }[] = [
   { id: "football", label: "Football", emoji: "⚽" },
   { id: "cricket",  label: "Cricket",  emoji: "🏏" },
   { id: "rugby",    label: "Rugby",    emoji: "🏉" },
 ];
+
+// Which countries actually have seeded teams for each sport — e.g. no
+// Botswana cricket league exists to seed (see the migration's sourcing
+// notes), so it's left out rather than shown as an empty option.
+const COUNTRIES_BY_SPORT: Record<Sport, Country[]> = {
+  football: ["Zimbabwe", "South Africa", "Botswana"],
+  cricket:  ["Zimbabwe", "South Africa"],
+  rugby:    ["Zimbabwe", "South Africa", "Botswana"],
+};
+
+const COUNTRY_FLAGS: Record<Country, string> = { Zimbabwe: "🇿🇼", "South Africa": "🇿🇦", Botswana: "🇧🇼" };
 
 function SportTabs({ value, onChange }: { value: Sport; onChange: (s: Sport) => void }) {
   return (
@@ -28,6 +40,27 @@ function SportTabs({ value, onChange }: { value: Sport; onChange: (s: Sport) => 
           )}
         >
           <span>{s.emoji}</span> {s.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function CountryTabs({ sport, value, onChange }: { sport: Sport; value: Country; onChange: (c: Country) => void }) {
+  const options = COUNTRIES_BY_SPORT[sport];
+  if (options.length <= 1) return null;
+  return (
+    <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
+      {options.map((c) => (
+        <button
+          key={c}
+          onClick={() => onChange(c)}
+          className={cn(
+            "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5",
+            value === c ? "bg-white text-zff-black shadow-sm" : "text-muted-foreground hover:text-zff-black"
+          )}
+        >
+          <span>{COUNTRY_FLAGS[c]}</span> {c}
         </button>
       ))}
     </div>
@@ -98,12 +131,20 @@ function buildTeamStats(finished: Match[]): TeamStat[] {
 
 export default function MatchStatsPage() {
   const [sport, setSport]           = useState<Sport>("football");
+  const [country, setCountry]       = useState<Country>("Zimbabwe");
   const [matches, setMatches]       = useState<Match[]>([]);
   const [playerStats, setPlayerStats] = useState<PlayerStat[]>([]);
   const [loading, setLoading]       = useState(true);
   const [tab, setTab]               = useState<"results" | "fixtures">("results");
   const [statSort, setStatSort]     = useState<StatSort>("total_points");
   const [sortDir, setSortDir]       = useState<"desc" | "asc">("desc");
+
+  // A country that isn't seeded for the newly-selected sport (e.g. Botswana
+  // has no cricket) falls back to Zimbabwe rather than showing an empty page.
+  function changeSport(s: Sport) {
+    setSport(s);
+    if (!COUNTRIES_BY_SPORT[s].includes(country)) setCountry("Zimbabwe");
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -115,14 +156,14 @@ export default function MatchStatsPage() {
         const sb = supabase as any;
         if (sport === "football") {
           const [{ data: matchData }, { data: statsData }] = await Promise.all([
-            sb.from("matches").select("*").eq("sport", "football").order("kickoff_time", { ascending: false }),
+            sb.from("matches").select("*").eq("sport", "football").eq("country", country).order("kickoff_time", { ascending: false }),
             sb.from("players").select("id, name, position, goals, assists, clean_sheets, minutes_played, yellow_cards, red_cards, total_points").order("total_points", { ascending: false }),
           ]);
           if (cancelled) return;
           if (matchData) setMatches(matchData);
           if (statsData) setPlayerStats(statsData);
         } else {
-          const { data: matchData } = await sb.from("matches").select("*").eq("sport", sport).order("kickoff_time", { ascending: false });
+          const { data: matchData } = await sb.from("matches").select("*").eq("sport", sport).eq("country", country).order("kickoff_time", { ascending: false });
           if (cancelled) return;
           if (matchData) setMatches(matchData);
           setPlayerStats([]);
@@ -133,7 +174,7 @@ export default function MatchStatsPage() {
     }
     load();
     return () => { cancelled = true; };
-  }, [sport]);
+  }, [sport, country]);
 
   const results  = matches.filter(m => m.status === "finished");
   const fixtures = matches.filter(m => m.status !== "finished").reverse();
@@ -161,10 +202,16 @@ export default function MatchStatsPage() {
 
   return (
     <div className="min-h-screen">
-      <TopBar title={`${sportLabel} Match Stats`} subtitle={`${sportLabel} results, fixtures & performance`} />
+      <TopBar
+        title={country === "Zimbabwe" ? `${sportLabel} Match Stats` : `${country} ${sportLabel} Match Stats`}
+        subtitle={`${sportLabel} results, fixtures & performance`}
+      />
 
       <div className="p-4 sm:p-6 lg:p-8 space-y-5">
-        <SportTabs value={sport} onChange={setSport} />
+        <div className="flex flex-wrap items-center gap-2">
+          <SportTabs value={sport} onChange={changeSport} />
+          <CountryTabs sport={sport} value={country} onChange={setCountry} />
+        </div>
 
         {/* Season summary */}
         {results.length > 0 && (
