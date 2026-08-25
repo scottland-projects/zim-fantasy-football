@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Users, Trophy, ShoppingCart,
   Radio, MessageCircle, User, Settings, Shield,
-  ChevronRight, LogOut, X, BarChart2, Target, Gamepad2,
+  ChevronRight, LogOut, X, BarChart2, Target, Gamepad2, Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -24,7 +24,7 @@ interface SidebarProps {
   isManager?: boolean;
 }
 
-type NavFlag = "fantasyTeams" | "scorePredictions" | "chat" | "polls" | null;
+type NavFlag = "fantasyTeams" | "scorePredictions" | "chat" | "polls" | "liveScoring" | null;
 interface NavItem { href: string; label: string; icon: LucideIcon; flag: NavFlag }
 
 const NAV_ITEMS: NavItem[] = [
@@ -33,6 +33,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/my-team",   label: "My Team",       icon: Users,           flag: "fantasyTeams" },
   { href: "/market",    label: "Player Market", icon: ShoppingCart,    flag: "fantasyTeams" },
   { href: "/predictions", label: "Predictions", icon: Target,          flag: "scorePredictions" },
+  { href: "/live",      label: "Live Center",   icon: Zap,             flag: "liveScoring" },
   { href: "/chat",      label: "Chat",          icon: MessageCircle,   flag: "chat" },
   { href: "/polls",     label: "Polls",         icon: BarChart2,       flag: "polls" },
   { href: "/leagues",   label: "Groups",        icon: Trophy,          flag: null },
@@ -45,11 +46,13 @@ function SidebarContent({ username, level, xp, avatarUrl, isAdmin, isManager, on
   const scorePredictionsEnabled = useFeatureFlag("scorePredictions");
   const chatEnabled = useFeatureFlag("chat");
   const pollsEnabled = useFeatureFlag("polls");
+  const liveScoringEnabled = useFeatureFlag("liveScoring");
   const visibleNavItems = NAV_ITEMS.filter((item) => {
     if (item.flag === "fantasyTeams") return fantasyTeamsEnabled;
     if (item.flag === "scorePredictions") return scorePredictionsEnabled;
     if (item.flag === "chat") return chatEnabled;
     if (item.flag === "polls") return pollsEnabled;
+    if (item.flag === "liveScoring") return liveScoringEnabled;
     return true;
   });
 
