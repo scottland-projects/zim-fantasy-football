@@ -1,9 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Logo } from "@/components/ui/Logo";
 import { motion } from "framer-motion";
-import { Trophy, Zap, Users, ChevronRight, Target } from "lucide-react";
+import { Trophy, Zap, Users, ChevronRight, Target, Download } from "lucide-react";
 
 const features = [
   { icon: Target, title: "Score Predictions", desc: "Predict match scores across football, cricket & rugby — no squad required" },
@@ -12,7 +13,48 @@ const features = [
   { icon: Zap, title: "Gamification", desc: "Earn XP, unlock badges, and climb the levels from Rookie to Legend" },
 ];
 
+// Chrome/Edge/Android fire this instead of letting the browser show its own
+// install UI, so a page can offer a custom "Install App" button — but it's
+// Chromium-only (never fires on Safari/iOS), so the button only appears
+// where it'll actually work; iOS users still install via manifest.ts +
+// apple-icon.png through Safari's own "Add to Home Screen" share-sheet
+// action, which this event can't trigger or detect.
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
+
 export default function HomeClient() {
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installed, setInstalled] = useState(false);
+
+  useEffect(() => {
+    setInstalled(window.matchMedia("(display-mode: standalone)").matches);
+
+    function onBeforeInstallPrompt(e: Event) {
+      e.preventDefault();
+      setInstallPrompt(e as BeforeInstallPromptEvent);
+    }
+    function onInstalled() {
+      setInstalled(true);
+      setInstallPrompt(null);
+    }
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
+
+  async function handleInstall() {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    await installPrompt.userChoice;
+    // A captured prompt can only be used once, whichever way the user chose.
+    setInstallPrompt(null);
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 overflow-hidden">
       {/* Background */}
@@ -54,13 +96,18 @@ export default function HomeClient() {
             Compete with fans nationwide. Real clubs, real points, pure passion.
           </p>
 
-          <div className="flex items-center justify-center gap-4">
+          <div className="flex items-center justify-center gap-4 flex-wrap">
             <Link href="/register" className="btn-primary flex items-center gap-2 text-base px-8 py-3">
               Start Playing Free <ChevronRight className="w-4 h-4" />
             </Link>
             <Link href="/login" className="btn-outline flex items-center gap-2 text-base">
               Sign In
             </Link>
+            {installPrompt && !installed && (
+              <button onClick={handleInstall} className="btn-outline flex items-center gap-2 text-base">
+                <Download className="w-4 h-4" /> Install App
+              </button>
+            )}
           </div>
         </motion.div>
 

@@ -19,6 +19,17 @@ const nextConfig: NextConfig = {
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
         ],
       },
+      {
+        // The service worker itself must never be cached — browsers already
+        // re-check it periodically, but a stale sw.js frozen behind a CDN
+        // cache would mean a shipped fix never reaches installed clients.
+        source: "/sw.js",
+        headers: [
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'" },
+        ],
+      },
     ];
   },
   images: {

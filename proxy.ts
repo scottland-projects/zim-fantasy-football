@@ -15,10 +15,13 @@ const AUTH_ONLY_PATHS = ["/login", "/register", "/forgot-password", "/reset-pass
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Pass through Next.js internals and static files
+  // Pass through Next.js internals and static files. Includes
+  // .webmanifest — the browser fetches app/manifest.ts's output to decide
+  // whether the app is installable, and needs it back directly rather than
+  // redirected to /login for an unauthenticated visitor.
   if (
     pathname.startsWith("/_next") ||
-    /\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$/.test(pathname)
+    /\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|webmanifest)$/.test(pathname)
   ) {
     return NextResponse.next({ request });
   }
