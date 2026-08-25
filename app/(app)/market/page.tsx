@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Player } from "@/lib/supabase/types";
 import { useFeatureFlag } from "@/lib/hooks/useFeatureFlag";
 import { FeatureDisabled } from "@/components/ui/FeatureDisabled";
+import MarketLoading from "./loading";
 
 
 type SortKey = "total_points" | "price" | "form" | "ownership_percent" | "goals" | "assists";
@@ -25,6 +26,7 @@ export default function MarketPage() {
   const [toast, setToast]             = useState<{ msg: string; type: "buy" | "sell" } | null>(null);
   const [busy, setBusy]               = useState<string | null>(null);
   const [showGuide, setShowGuide]     = useState(true);
+  const [loading, setLoading]         = useState(true);
   const marketplaceEnabled            = useFeatureFlag("marketplace");
   const fantasyTeamsEnabled           = useFeatureFlag("fantasyTeams");
 
@@ -77,7 +79,10 @@ export default function MarketPage() {
             .single();
           if (newTeam) teamIdRef.current = newTeam.id;
         }
-      } catch { /* keep mock player list, inMyTeam stays empty */ }
+      } catch { /* keep mock player list, inMyTeam stays empty */
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, [fantasyTeamsEnabled]);
@@ -161,6 +166,10 @@ export default function MarketPage() {
   }
   if (!marketplaceEnabled) {
     return <FeatureDisabled title="Player Market" message="The club has temporarily paused transfers. Check back soon." />;
+  }
+
+  if (loading) {
+    return <MarketLoading />;
   }
 
   return (

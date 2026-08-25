@@ -13,6 +13,7 @@ import {
   Gift, Globe, Save, Zap, X, Clock, KeyRound,
   Lock, ChevronDown, UserMinus, ShieldAlert,
 } from "lucide-react";
+import AdminLoading from "./loading";
 
 interface AdminMatch {
   id: string;
@@ -67,6 +68,7 @@ export default function AdminPage() {
   const [platformStats, setPlatformStats] = useState({ leagues: 0, liveMatches: 0, notifications: 0 });
   const [healthStats, setHealthStats] = useState({ teams: 0, playersPicked: 0, messages: 0, finishedMatches: 0 });
   const [recentResults, setRecentResults] = useState<{ home_team: string; away_team: string; home_score: number; away_score: number; matchday: number; kickoff_time: string }[]>([]);
+  const [pageLoading, setPageLoading] = useState(true);
 
   // Load real players and users from Supabase
   useEffect(() => {
@@ -150,7 +152,10 @@ export default function AdminPage() {
           .order("kickoff_time", { ascending: false })
           .limit(4);
         if (results) setRecentResults(results as typeof recentResults);
-      } catch { /* show zeros */ }
+      } catch { /* show zeros */
+      } finally {
+        setPageLoading(false);
+      }
     }
     loadData();
   }, []);
@@ -609,6 +614,10 @@ export default function AdminPage() {
       }
     } catch { showToast("error", "Failed to add player"); }
     finally { setSavingPlayer(false); }
+  }
+
+  if (pageLoading) {
+    return <AdminLoading />;
   }
 
   return (

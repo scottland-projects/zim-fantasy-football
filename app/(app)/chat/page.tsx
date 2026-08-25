@@ -28,6 +28,7 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
   const chatEnabled = useFeatureFlag("chat");
   const [canModerate, setCanModerate] = useState(false);
+  const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -74,7 +75,10 @@ export default function ChatPage() {
           };
         });
         if (mounted) setMessages(formatted);
-      } catch { /* keep mock */ }
+      } catch { /* keep mock */
+      } finally {
+        if (mounted) setLoading(false);
+      }
     }
     fetchHistory();
 
@@ -191,7 +195,11 @@ export default function ChatPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {messages.map((msg) => (
+              {loading ? (
+                <p className="text-sm text-muted-foreground text-center py-10">Loading messages…</p>
+              ) : messages.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-10">No messages yet — be the first to say something.</p>
+              ) : messages.map((msg) => (
                 <motion.div
                   key={msg.id}
                   initial={{ opacity: 0, y: 10 }}

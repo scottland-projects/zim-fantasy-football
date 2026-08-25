@@ -11,6 +11,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { useFeatureFlag } from "@/lib/hooks/useFeatureFlag";
+import DashboardLoading from "./loading";
 
 type Sport = "football" | "cricket" | "rugby";
 
@@ -265,6 +266,16 @@ export default function DashboardPage() {
     e.username.toLowerCase().includes(search.toLowerCase()) ||
     e.team.toLowerCase().includes(search.toLowerCase())
   );
+
+  // leaderboardLoading doubles as the whole page's initial-fetch flag —
+  // it's already set false exactly once, when fetchAll() finishes, and
+  // every stat card on this page (predictionPoints, groupsJoined,
+  // weeklyPoints, totalManagers, teamValue, ...) comes from that same
+  // fetch, so gating on it here stops those cards from briefly showing
+  // "0" as if that were the real, final value.
+  if (leaderboardLoading) {
+    return <DashboardLoading />;
+  }
 
   return (
     <div className="min-h-screen">

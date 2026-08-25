@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { createLeague, joinLeague, deleteLeagueAction, getPublicLeagues, joinPublicLeague, leaveLeagueAction } from "@/lib/actions/leagues";
 import { useFeatureFlag } from "@/lib/hooks/useFeatureFlag";
+import LeaguesLoading from "./loading";
 
 
 interface League {
@@ -57,6 +58,7 @@ export default function LeaguesPage() {
   const [leagueMembers, setLeagueMembers] = useState<{ username: string; points: number; weekly: number; level: number; xp: number }[]>([]);
   const [modalRankMode, setModalRankMode] = useState<"fantasy" | "overall">("overall");
   const [membersLoading, setMembersLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [confirmLeaveId, setConfirmLeaveId] = useState<string | null>(null);
@@ -189,7 +191,10 @@ export default function LeaguesPage() {
             })));
           }
         }
-      } catch { /* show empty */ }
+      } catch { /* show empty */
+      } finally {
+        setPageLoading(false);
+      }
     }
     loadAll();
   }, []);
@@ -280,6 +285,10 @@ export default function LeaguesPage() {
     if (diff > 0) return <span className="text-zff-green text-xs flex items-center gap-0.5"><TrendingUp className="w-3 h-3" />{diff}</span>;
     if (diff < 0) return <span className="text-red-400 text-xs flex items-center gap-0.5"><TrendingDown className="w-3 h-3" />{Math.abs(diff)}</span>;
     return <span className="text-muted-foreground text-xs"><Minus className="w-3 h-3" /></span>;
+  }
+
+  if (pageLoading) {
+    return <LeaguesLoading />;
   }
 
   return (

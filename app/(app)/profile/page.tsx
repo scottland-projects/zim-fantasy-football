@@ -12,6 +12,7 @@ import { cn, getLevelTitle, getXPForNextLevel } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { updateProfileAction } from "@/lib/actions/profile";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import ProfileLoading from "./loading";
 
 
 const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) => {
@@ -59,6 +60,7 @@ export default function ProfilePage() {
   const lockedBadges = BADGE_CATALOG.filter((b) => !achievements.some((a) => a.key === b.key));
   const [predictionPoints, setPredictionPoints] = useState(0);
   const [platformRank, setPlatformRank] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadProfile() {
@@ -123,7 +125,10 @@ export default function ProfilePage() {
             setPointsHistory(Object.entries(byMatchday).sort(([a],[b]) => Number(a)-Number(b)).map(([md, pts]) => ({ md: `MD${md}`, pts: pts as number })));
           }
         }
-      } catch { /* show empty state */ }
+      } catch { /* show empty state */
+      } finally {
+        setLoading(false);
+      }
     }
     loadProfile();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -144,6 +149,10 @@ export default function ProfilePage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  if (loading) {
+    return <ProfileLoading />;
   }
 
   return (

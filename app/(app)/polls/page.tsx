@@ -16,6 +16,7 @@ export default function PollsPage() {
   const [creatingPoll, setCreatingPoll] = useState(false);
   const [pollFormError, setPollFormError] = useState("");
   const pollsEnabled = useFeatureFlag("polls");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const supabase = createClient();
@@ -74,7 +75,10 @@ export default function PollsPage() {
             groupName: p.league_id ? (groupNameById[p.league_id] ?? "Private Group") : null,
           };
         }));
-      } catch { /* keep empty */ }
+      } catch { /* keep empty */
+      } finally {
+        if (mounted) setLoading(false);
+      }
     }
     fetchPolls();
 
@@ -205,7 +209,11 @@ export default function PollsPage() {
           )}
         </AnimatePresence>
 
-        {pollData.length === 0 ? (
+        {loading ? (
+          <div className="glass-card flex flex-col items-center justify-center py-16 px-6 text-center">
+            <p className="text-sm text-muted-foreground">Loading polls…</p>
+          </div>
+        ) : pollData.length === 0 ? (
           <div className="glass-card flex flex-col items-center justify-center py-16 px-6 text-center">
             <BarChart2 className="w-10 h-10 text-slate-300 mb-3" />
             <p className="text-sm font-semibold text-zff-black mb-1">No active polls right now</p>

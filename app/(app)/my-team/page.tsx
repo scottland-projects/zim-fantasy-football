@@ -15,6 +15,7 @@ import { saveTeam } from "@/lib/actions/team";
 import type { Player } from "@/lib/supabase/types";
 import { useFeatureFlag } from "@/lib/hooks/useFeatureFlag";
 import { FeatureDisabled } from "@/components/ui/FeatureDisabled";
+import MyTeamLoading from "./loading";
 
 const FORMATIONS: Record<string, { GK: number; DEF: number; MID: number; FWD: number }> = {
   "4-3-3": { GK: 1, DEF: 4, MID: 3, FWD: 3 },
@@ -40,6 +41,7 @@ export default function MyTeamPage() {
   const [showHelp, setShowHelp]         = useState(false);
   const [allPlayers, setAllPlayers]     = useState<Player[]>([]);
   const [squadIds, setSquadIds]         = useState<Set<string>>(new Set<string>());
+  const [loading, setLoading]           = useState(true);
 
   // Load players + team from Supabase on mount. Skipped while Fantasy
   // Teams is disabled — this page renders FeatureDisabled in that case and
@@ -91,7 +93,10 @@ export default function MyTeamPage() {
         if (starters.length > 0) setSelectedIds(starters);
         if (cap)  setCaptainId(cap);
         if (vice) setViceCaptainId(vice);
-      } catch { /* not authenticated — squad stays empty */ }
+      } catch { /* not authenticated — squad stays empty */
+      } finally {
+        setLoading(false);
+      }
     }
     loadData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -325,6 +330,10 @@ export default function MyTeamPage() {
 
   if (!fantasyTeamsEnabled) {
     return <FeatureDisabled title="Fantasy Teams" message="Squad-building is temporarily paused. Try Score Predictions instead." />;
+  }
+
+  if (loading) {
+    return <MyTeamLoading />;
   }
 
   return (

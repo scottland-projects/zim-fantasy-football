@@ -102,6 +102,7 @@ function FootballLive({ sport, onSportChange }: { sport: Sport; onSportChange: (
   } | null>(null);
   const [events, setEvents] = useState<LiveEvent[]>([]);
   const [liveLeaderboard, setLiveLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const matchTime = useMatchClock(liveMatch?.kickoffTime ?? null);
 
@@ -143,7 +144,10 @@ function FootballLive({ sport, onSportChange }: { sport: Sport; onSportChange: (
             total: p.fantasy_points ?? 0,
           })));
         }
-      } catch { /* show empty */ }
+      } catch { /* show empty */
+      } finally {
+        setLoading(false);
+      }
     }
 
     load();
@@ -173,6 +177,20 @@ function FootballLive({ sport, onSportChange }: { sport: Sport; onSportChange: (
 
     return () => { supabase.removeChannel(channel); };
   }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen w-full overflow-x-hidden">
+        <TopBar title="Live Center" subtitle="Checking for a live match…" />
+        <div className="p-4 sm:p-6 lg:p-8">
+          <SportTabs value={sport} onChange={onSportChange} />
+          <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!liveMatch) {
     return (
@@ -337,6 +355,7 @@ function PredictionOnlyLive({ sport, onSportChange }: { sport: Sport; onSportCha
   const [match, setMatch] = useState<PredictionOnlyMatch | null>(null);
   const [predictors, setPredictors] = useState<PredictorRow[]>([]);
   const [myUserId, setMyUserId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const elapsed = useElapsedMinutes(match?.kickoffTime ?? null);
 
@@ -344,6 +363,7 @@ function PredictionOnlyLive({ sport, onSportChange }: { sport: Sport; onSportCha
     const supabase = createClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
+    setLoading(true);
 
     async function load() {
       try {
@@ -378,7 +398,10 @@ function PredictionOnlyLive({ sport, onSportChange }: { sport: Sport; onSportCha
             delta: Math.abs(p.predicted_home_score - homeScore) + Math.abs(p.predicted_away_score - awayScore),
           })).sort((a, b) => a.delta - b.delta)
         );
-      } catch { /* show empty */ }
+      } catch { /* show empty */
+      } finally {
+        setLoading(false);
+      }
     }
 
     load();
@@ -402,6 +425,20 @@ function PredictionOnlyLive({ sport, onSportChange }: { sport: Sport; onSportCha
   }, [sport]);
 
   const sportLabel = sport === "cricket" ? "Cricket" : "Rugby";
+
+  if (loading) {
+    return (
+      <div className="min-h-screen w-full overflow-x-hidden">
+        <TopBar title="Live Center" subtitle="Checking for a live match…" />
+        <div className="p-4 sm:p-6 lg:p-8">
+          <SportTabs value={sport} onChange={onSportChange} />
+          <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!match) {
     return (
