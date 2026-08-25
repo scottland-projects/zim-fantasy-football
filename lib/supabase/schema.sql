@@ -600,12 +600,18 @@ CREATE TABLE IF NOT EXISTS poll_votes (
 ALTER TABLE poll_votes ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users view own votes" ON poll_votes FOR SELECT USING (auth.uid() = user_id);
 
+-- Voting again with a different option CHANGES the vote (moves the tally
+-- from the old option to the new one) rather than being rejected — users
+-- asked for this. Re-picking the same option is a no-op. Changing a vote
+-- does NOT grant another +5 XP (only a genuinely first vote does), so
+-- flipping a pick back and forth can't be used to farm XP.
 CREATE OR REPLACE FUNCTION cast_poll_vote(p_poll_id UUID, p_option TEXT)
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_user     UUID := auth.uid();
   v_existing TEXT;
   v_votes    JSONB;
+  v_new      JSONB;
 BEGIN
   IF v_user IS NULL THEN RETURN jsonb_build_object('ok', false, 'error', 'not authenticated'); END IF;
 
@@ -620,25 +626,40 @@ BEGIN
   END IF;
 
   SELECT option INTO v_existing FROM poll_votes WHERE poll_id = p_poll_id AND user_id = v_user;
-  IF v_existing IS NOT NULL THEN
-    RETURN jsonb_build_object('ok', false, 'error', 'already voted', 'choice', v_existing);
+
+  IF v_existing IS NOT NULL AND v_existing = p_option THEN
+    SELECT votes INTO v_votes FROM polls WHERE id = p_poll_id;
+    RETURN jsonb_build_object('ok', true, 'votes', v_votes, 'choice', p_option, 'changed', false);
   END IF;
 
-  INSERT INTO poll_votes (poll_id, user_id, option) VALUES (p_poll_id, v_user, p_option);
+  SELECT votes INTO v_votes FROM polls WHERE id = p_poll_id;
+  v_new := COALESCE(v_votes, '{}'::jsonb);
 
-  UPDATE polls
-  SET votes = jsonb_set(COALESCE(votes, '{}'::jsonb), ARRAY[p_option], to_jsonb(COALESCE((votes ->> p_option)::int, 0) + 1))
-  WHERE id = p_poll_id
-  RETURNING votes INTO v_votes;
+  IF v_existing IS NOT NULL THEN
+    v_new := jsonb_set(v_new, ARRAY[v_existing], to_jsonb(GREATEST(0, COALESCE((v_new ->> v_existing)::int, 0) - 1)));
+  END IF;
+
+  v_new := jsonb_set(v_new, ARRAY[p_option], to_jsonb(COALESCE((v_new ->> p_option)::int, 0) + 1));
+
+  IF v_existing IS NOT NULL THEN
+    UPDATE poll_votes SET option = p_option WHERE poll_id = p_poll_id AND user_id = v_user;
+  ELSE
+    INSERT INTO poll_votes (poll_id, user_id, option) VALUES (p_poll_id, v_user, p_option);
+  END IF;
+
+  UPDATE polls SET votes = v_new WHERE id = p_poll_id;
 
   -- Small XP nudge for voting — ties polls into the same points/XP economy
   -- as everything else instead of being disconnected from it. Inlined
   -- rather than calling grant_xp() because that function is deliberately
   -- restricted to admin/manager callers (see its own comment) — a regular
-  -- user voting on their own poll can't go through it.
-  PERFORM _grant_xp_unchecked(v_user, 5);
+  -- user voting on their own poll can't go through it. Only a genuinely
+  -- first vote grants it — see the function's header comment.
+  IF v_existing IS NULL THEN
+    PERFORM _grant_xp_unchecked(v_user, 5);
+  END IF;
 
-  RETURN jsonb_build_object('ok', true, 'votes', v_votes, 'choice', p_option);
+  RETURN jsonb_build_object('ok', true, 'votes', v_new, 'choice', p_option, 'changed', v_existing IS NOT NULL);
 END;
 $$;
 

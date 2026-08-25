@@ -85,16 +85,29 @@ export default function PollsPage() {
     return () => { mounted = false; };
   }, []);
 
+  // Voting again with a different option changes your vote (moves the
+  // tally, doesn't grant another +5 XP — see cast_poll_vote) rather than
+  // being blocked; re-picking the same option is a no-op.
   async function vote(pollId: string, option: string) {
     if (!pollsEnabled) return;
+
+    const poll = pollData.find((p) => p.id === pollId);
+    if (!poll || poll.voted === option) return;
+    const previousState = poll;
+
     setPollData((prev) =>
       prev.map((p) => {
-        if (p.id !== pollId || p.voted) return p;
+        if (p.id !== pollId) return p;
+        const hadVote = p.voted;
         return {
           ...p,
           voted: option,
-          options: p.options.map((o) => o.label === option ? { ...o, votes: o.votes + 1 } : o),
-          totalVotes: p.totalVotes + 1,
+          options: p.options.map((o) => {
+            if (o.label === option) return { ...o, votes: o.votes + 1 };
+            if (hadVote && o.label === hadVote) return { ...o, votes: Math.max(0, o.votes - 1) };
+            return o;
+          }),
+          totalVotes: hadVote ? p.totalVotes : p.totalVotes + 1,
         };
       })
     );
@@ -103,19 +116,13 @@ export default function PollsPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data } = await (supabase as any).rpc("cast_poll_vote", { p_poll_id: pollId, p_option: option });
       if (data?.ok === false) {
-        setPollData((prev) =>
-          prev.map((p) => {
-            if (p.id !== pollId) return p;
-            return {
-              ...p,
-              voted: data.choice ?? null,
-              options: p.options.map((o) => o.label === option ? { ...o, votes: Math.max(0, o.votes - 1) } : o),
-              totalVotes: Math.max(0, p.totalVotes - 1),
-            };
-          })
-        );
+        // Roll back to the exact pre-vote state (e.g. polls got disabled
+        // mid-click, or the option list changed under us).
+        setPollData((prev) => prev.map((p) => (p.id === pollId ? previousState : p)));
       }
-    } catch { /* optimistic update stands */ }
+    } catch {
+      setPollData((prev) => prev.map((p) => (p.id === pollId ? previousState : p)));
+    }
   }
 
   async function createPoll() {
@@ -239,14 +246,13 @@ export default function PollsPage() {
                     <button
                       key={option.label}
                       onClick={() => vote(poll.id, option.label)}
-                      disabled={!!poll.voted || !pollsEnabled}
+                      disabled={!pollsEnabled}
+                      title={poll.voted && poll.voted !== option.label ? "Change your vote to this option" : undefined}
                       className={cn(
                         "w-full text-left rounded-xl overflow-hidden border transition-all",
                         poll.voted === option.label
                           ? "border-zff-green/40 bg-zff-green/10"
-                          : poll.voted
-                            ? "border-slate-200"
-                            : "border-slate-200 hover:border-zff-green/30"
+                          : "border-slate-200 hover:border-zff-green/30"
                       )}
                     >
                       <div className="relative p-3">
@@ -269,7 +275,9 @@ export default function PollsPage() {
                   );
                 })}
               </div>
-              <p className="text-xs text-muted-foreground mt-3">{poll.totalVotes} votes</p>
+              <p className="text-xs text-muted-foreground mt-3">
+                {poll.totalVotes} votes{poll.voted && pollsEnabled ? " · tap another option to change your vote" : ""}
+              </p>
             </div>
           ))}
         </div>
