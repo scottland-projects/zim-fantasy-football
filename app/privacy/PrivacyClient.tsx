@@ -20,7 +20,7 @@ function PrivacyPolicyContent() {
             <Logo size={64} />
           </div>
           <h1 className="font-display text-3xl text-zff-black tracking-wider">PRIVACY POLICY</h1>
-          <p className="text-sm text-muted-foreground mt-2">Africa Fantasy — Effective 29 May 2026</p>
+          <p className="text-sm text-muted-foreground mt-2">Africa Fantasy • Effective 29 May 2026</p>
         </div>
 
         {/* Policy card */}
@@ -61,18 +61,18 @@ function PrivacyPolicyContent() {
             <h2 className="text-base font-bold text-zff-black mb-3">2A. Public Sports Information (Not Personal Data)</h2>
             <p className="mb-3">
               Separately from the personal data described in Section 2, the Platform displays factual sporting
-              information about real football, cricket, and rugby competitions in Zimbabwe — including club and team
+              information about real football, cricket, and rugby competitions in Zimbabwe, including club and team
               names, competition and league names, fixture lists, matchdays, and results. This information:
             </p>
             <ul className="list-disc list-inside space-y-2 pl-2">
               <li>is drawn from what we understand to be publicly available knowledge of these competitions, not from any private or confidential source;</li>
-              <li>is not personal data — it does not identify any individual user of the Platform and is not collected about you;</li>
+              <li>is not personal data: it does not identify any individual user of the Platform and is not collected about you;</li>
               <li>is displayed to every user and visitor as general content (fixtures, predictions targets, results, and related statistics), independent of any individual account; and</li>
-              <li>is used only to power gameplay features — Score Predictions, fixtures, and results displays — not to build any profile about you personally.</li>
+              <li>is used only to power gameplay features (Score Predictions, fixtures, and results displays), not to build any profile about you personally.</li>
             </ul>
             <p className="mt-3">
               This is distinct from your personal data: the club and competition information above describes the
-              real world of sport, while Section 2 describes information we hold about <em>you</em> — your account,
+              real world of sport, while Section 2 describes information we hold about <em>you</em>: your account,
               the predictions you make, and how you use the Platform. Your predictions and activity linked to your
               account remain personal data and are handled as described elsewhere in this Policy, even though the
               fixtures and results they relate to are not.
@@ -80,7 +80,7 @@ function PrivacyPolicyContent() {
             <p className="mt-3">
               This Privacy Policy addresses only how this public sporting information relates to your personal data.
               It does not address trademark, copyright, or other intellectual property questions relating to club,
-              league, or competition names — those are addressed in Section 6 of our{" "}
+              league, or competition names. Those are addressed in Section 6 of our{" "}
               <Link href="/terms" className="text-zff-green hover:underline">Terms of Service</Link>, including how
               to contact us if you are a rights holder with a concern.
             </p>
@@ -171,7 +171,7 @@ function PrivacyPolicyContent() {
             <p className="mb-3">
               To the maximum extent permitted by applicable law, OMNI Global, its directors, officers, employees, agents,
               partners, and licensors shall not be liable for any indirect, incidental, special, consequential, or punitive
-              damages — including but not limited to loss of profits, data, goodwill, or other intangible losses — arising from:
+              damages, including but not limited to loss of profits, data, goodwill, or other intangible losses, arising from:
             </p>
             <ul className="list-disc list-inside space-y-2 pl-2">
               <li>your use of, or inability to use, the Platform;</li>
@@ -209,7 +209,7 @@ function PrivacyPolicyContent() {
               <li><strong>Rectify</strong> inaccurate or incomplete data via your profile settings.</li>
               <li><strong>Erase</strong> your personal data by deleting your account or submitting a written request.</li>
               <li><strong>Restrict</strong> or <strong>object</strong> to certain processing of your data.</li>
-              <li><strong>Data portability</strong> — receive your data in a structured, machine-readable format.</li>
+              <li><strong>Data portability:</strong> receive your data in a structured, machine-readable format.</li>
               <li><strong>Withdraw consent</strong> to marketing communications at any time.</li>
             </ul>
             <p className="mt-3">
@@ -263,7 +263,7 @@ function PrivacyPolicyContent() {
             </p>
             <address className="not-italic mt-3 p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm space-y-1">
               <p><strong>OMNI Global</strong></p>
-              <p>Africa Fantasy — Data Privacy</p>
+              <p>Africa Fantasy • Data Privacy</p>
               <p>Email: <a href="mailto:privacy@omniglobal.one" className="text-zff-green hover:underline">privacy@omniglobal.one</a></p>
             </address>
           </section>

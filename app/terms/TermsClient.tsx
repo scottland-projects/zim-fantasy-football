@@ -20,13 +20,13 @@ function TermsOfServiceContent() {
             <Logo size={64} />
           </div>
           <h1 className="font-display text-3xl text-zff-black tracking-wider">TERMS OF SERVICE</h1>
-          <p className="text-sm text-muted-foreground mt-2">Africa Fantasy — Effective 29 May 2026</p>
+          <p className="text-sm text-muted-foreground mt-2">Africa Fantasy • Effective 29 May 2026</p>
         </div>
 
         {/* Disclaimer banner — the platform's independence is the single most
             important thing a new user needs to see before anything else. */}
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 mb-6 text-sm text-amber-900 leading-relaxed">
-          <p className="font-bold mb-1">Independent fan platform — not affiliated with any club or league</p>
+          <p className="font-bold mb-1">Independent fan platform: not affiliated with any club or league</p>
           <p>
             Africa Fantasy is an independent fantasy sports platform created for Zimbabwean sports fans, covering
             football, cricket, and rugby. It is not affiliated with, endorsed by, or officially connected to ZIFA,
@@ -61,7 +61,7 @@ function TermsOfServiceContent() {
             </p>
             <ul className="list-disc list-inside space-y-2 pl-2">
               <li>Not affiliated with, endorsed by, sponsored by, or officially connected to ZIFA, the Premier Soccer League, Zimbabwe Cricket, Zimbabwe Rugby Union, or any real club.</li>
-              <li>Built around original branding, scoring rules, and content — it does not use official club crests, kits, or copyrighted media.</li>
+              <li>Built around original branding, scoring rules, and content; it does not use official club crests, kits, or copyrighted media.</li>
               <li>Free to enter. There is no pay-to-play entry fee, and the Platform does not operate any pooled-stake or betting mechanic.</li>
               <li>Funded by advertising and sponsorships; any prizes offered are provided or funded by sponsors, not paid out of user entry fees, because none are collected.</li>
             </ul>
@@ -85,7 +85,7 @@ function TermsOfServiceContent() {
           <section>
             <h2 className="text-base font-bold text-zff-black mb-3">4. Game Modes &amp; Rules</h2>
             <p className="mb-3">
-              The Platform offers more than one way to play, and not every game mode is always available — the
+              The Platform offers more than one way to play, and not every game mode is always available: the
               Platform may enable or disable individual game modes at its discretion.
             </p>
             <p className="mb-3">
@@ -96,8 +96,8 @@ function TermsOfServiceContent() {
             </p>
             <p className="mb-3">
               <strong>Score Predictions (football, cricket &amp; rugby).</strong> Users predict a match's final
-              score before kickoff. Points are awarded on accuracy — an exact score, a correct outcome and margin,
-              or a correct outcome alone — once the real result is recorded. Predictions lock at kickoff and cannot
+              score before kickoff. Points are awarded on accuracy (an exact score, a correct outcome and margin,
+              or a correct outcome alone) once the real result is recorded. Predictions lock at kickoff and cannot
               be changed afterward.
             </p>
             <p className="mb-3">
@@ -202,7 +202,7 @@ function TermsOfServiceContent() {
             <p>For questions about these Terms, contact OMNI Global at:</p>
             <address className="not-italic mt-3 p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm space-y-1">
               <p><strong>OMNI Global</strong></p>
-              <p>Africa Fantasy — Legal</p>
+              <p>Africa Fantasy • Legal</p>
               <p>Email: <a href="mailto:legal@omniglobal.one" className="text-zff-green hover:underline">legal@omniglobal.one</a></p>
             </address>
           </section>
