@@ -324,6 +324,79 @@ export async function savePrizesAction(leagueId: string, prizes: { first: string
   return { success: true };
 }
 
+// The admin Leagues tab previously only ever queried `type = 'public'` —
+// private groups (and their full member rosters) were completely invisible
+// to admin, so there was no way to moderate a private group's membership at
+// all. Service role bypasses RLS deliberately here: admin needs to see
+// every group and every member for moderation, not just what a normal
+// member-scoped read would return.
+export async function getAllLeaguesForModerationAction() {
+  const { error } = await requireAdmin();
+  if (error) return { error, leagues: [] };
+
+  const admin = serviceRole();
+  const { data: leagues, error: leaguesErr } = await admin
+    .from("leagues")
+    .select("id, name, type, invite_code, owner_id, created_at, prizes")
+    .order("created_at", { ascending: false });
+  if (leaguesErr || !leagues) return { error: leaguesErr?.message ?? "Failed to load groups", leagues: [] };
+
+  const { data: members } = await admin
+    .from("league_members")
+    .select("league_id, user_id, joined_at");
+
+  const userIds = [...new Set((members ?? []).map((m: { user_id: string }) => m.user_id))];
+  const { data: profiles } = userIds.length
+    ? await admin.from("profiles").select("id, username, role, avatar_url").in("id", userIds)
+    : { data: [] };
+  const profileMap = new Map((profiles ?? []).map((p: { id: string; username: string; role: string; avatar_url: string | null }) => [p.id, p]));
+
+  const membersByLeague: Record<string, { userId: string; username: string; role: string; avatarUrl: string | null; joinedAt: string }[]> = {};
+  for (const m of (members ?? []) as { league_id: string; user_id: string; joined_at: string }[]) {
+    const p = profileMap.get(m.user_id) as { username: string; role: string; avatar_url: string | null } | undefined;
+    (membersByLeague[m.league_id] ??= []).push({
+      userId: m.user_id,
+      username: p?.username ?? "Unknown",
+      role: p?.role ?? "user",
+      avatarUrl: p?.avatar_url ?? null,
+      joinedAt: m.joined_at,
+    });
+  }
+
+  return {
+    error: null,
+    leagues: leagues.map((l: { id: string; name: string; type: string; invite_code: string; owner_id: string; created_at: string; prizes: { first: string; second: string; third: string } | null }) => ({
+      id: l.id,
+      name: l.name,
+      type: l.type,
+      inviteCode: l.invite_code,
+      ownerId: l.owner_id,
+      ownerUsername: (profileMap.get(l.owner_id) as { username: string } | undefined)?.username ?? "Unknown",
+      createdAt: l.created_at,
+      prizes: l.prizes,
+      members: (membersByLeague[l.id] ?? []).sort((a, b) => a.username.localeCompare(b.username)),
+    })),
+  };
+}
+
+// Removes one member from a group without deleting the whole group —
+// deleteLeagueAction already covers admin removing an entire group.
+export async function adminRemoveLeagueMemberAction(leagueId: string, userId: string) {
+  const { error } = await requireAdmin();
+  if (error) return { error };
+
+  const admin = serviceRole();
+  const { data: league } = await admin.from("leagues").select("owner_id").eq("id", leagueId).single();
+  if (!league) return { error: "Group not found" };
+  if (league.owner_id === userId) return { error: "Can't remove the owner — delete the whole group instead" };
+
+  const { error: delErr } = await admin.from("league_members").delete().eq("league_id", leagueId).eq("user_id", userId);
+  if (delErr) return { error: delErr.message };
+
+  revalidatePath("/admin");
+  return { success: true };
+}
+
 export async function updateUserRoleAction(userId: string, role: string) {
   const VALID_ROLES = ["user", "manager", "moderator", "admin"];
   if (!VALID_ROLES.includes(role)) return { error: "Invalid role" };

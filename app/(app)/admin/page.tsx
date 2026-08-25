@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { saveFlagsAction, updateMatchStatusAction, cancelMatchLiveAction, saveFixtureAction, saveMatchStatsAction, savePrizesAction, updateUserRoleAction, broadcastNotificationAction, addPlayerAction, editPlayerAction, deletePlayerAction, adminResetPasswordAction, logMatchEventAction, deleteMatchEventAction, reopenMatchAction, listUserEmailsAction, finishPredictionOnlyMatchAction, reopenPredictionOnlyMatchAction, goLivePredictionOnlyMatchAction, updateLiveScorePredictionOnlyAction } from "@/lib/actions/admin";
+import { saveFlagsAction, updateMatchStatusAction, cancelMatchLiveAction, saveFixtureAction, saveMatchStatsAction, savePrizesAction, updateUserRoleAction, broadcastNotificationAction, addPlayerAction, editPlayerAction, deletePlayerAction, adminResetPasswordAction, logMatchEventAction, deleteMatchEventAction, reopenMatchAction, listUserEmailsAction, finishPredictionOnlyMatchAction, reopenPredictionOnlyMatchAction, goLivePredictionOnlyMatchAction, updateLiveScorePredictionOnlyAction, getAllLeaguesForModerationAction, adminRemoveLeagueMemberAction } from "@/lib/actions/admin";
 import { deleteLeagueAction } from "@/lib/actions/leagues";
 import { motion, AnimatePresence } from "framer-motion";
 import { TopBar } from "@/components/layout/TopBar";
@@ -11,6 +11,7 @@ import {
   Plus, Edit, Trash2, CheckCircle, XCircle, Send,
   TrendingUp, AlertTriangle, Database, Eye, EyeOff, ToggleLeft,
   Gift, Globe, Save, Zap, X, Clock, KeyRound,
+  Lock, ChevronDown, UserMinus, ShieldAlert,
 } from "lucide-react";
 
 interface AdminMatch {
@@ -99,26 +100,21 @@ export default function AdminPage() {
         const { data: matchesData } = await supabase.from("matches").select("*").order("matchday", { ascending: false });
         if (matchesData && matchesData.length > 0) setDbMatches(matchesData as AdminMatch[]);
 
-        // Public leagues for prize management
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: leaguesData } = await (supabase as any)
-          .from("leagues")
-          .select("id, name, prizes, league_members(count)")
-          .eq("type", "public")
-          .order("created_at", { ascending: false });
-        if (leaguesData && leaguesData.length > 0) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const mapped = (leaguesData as any[]).map((l: any) => ({
-            id: l.id,
-            name: l.name,
-            member_count: l.league_members?.[0]?.count ?? 0,
-            prizes: l.prizes ?? null,
-          }));
-          setPublicLeagues(mapped);
+        // All groups (public + private), full rosters, for moderation — the
+        // Public League Prizes card below derives from this instead of its
+        // own query, which previously went through the anon-key client's
+        // embedded `league_members(count)` and silently came back as 0 for
+        // every league (RLS on that count subquery, not visible without a
+        // service-role read).
+        getAllLeaguesForModerationAction().then(res => {
+          if (res.error) return;
+          setAllGroups(res.leagues);
+          const publicOnes = res.leagues.filter(l => l.type === "public");
+          setPublicLeagues(publicOnes.map(l => ({ id: l.id, name: l.name, member_count: l.members.length, prizes: l.prizes })));
           const initial: Record<string, { first: string; second: string; third: string }> = {};
-          mapped.forEach(l => { initial[l.id] = { first: l.prizes?.first ?? "", second: l.prizes?.second ?? "", third: l.prizes?.third ?? "" }; });
+          publicOnes.forEach(l => { initial[l.id] = { first: l.prizes?.first ?? "", second: l.prizes?.second ?? "", third: l.prizes?.third ?? "" }; });
           setEditingPrizes(initial);
-        }
+        }).finally(() => setGroupsLoading(false));
 
         // Recent notifications
         const { data: recentNotifsData } = await supabase
@@ -189,6 +185,17 @@ export default function AdminPage() {
   const [publicLeagues, setPublicLeagues] = useState<{ id: string; name: string; member_count: number; prizes: { first: string; second: string; third: string } | null }[]>([]);
   const [editingPrizes, setEditingPrizes] = useState<Record<string, { first: string; second: string; third: string }>>({});
   const [savingPrize, setSavingPrize] = useState<string | null>(null);
+
+  // All groups (public + private) with full member rosters, for moderation —
+  // the section above this only ever showed public leagues, and only a
+  // member count, so a private group's membership was invisible to admin.
+  interface GroupMember { userId: string; username: string; role: string; avatarUrl: string | null; joinedAt: string }
+  interface ModerationGroup { id: string; name: string; type: string; inviteCode: string; ownerId: string; ownerUsername: string; createdAt: string; prizes: { first: string; second: string; third: string } | null; members: GroupMember[] }
+  const [allGroups, setAllGroups] = useState<ModerationGroup[]>([]);
+  const [groupsLoading, setGroupsLoading] = useState(true);
+  const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
+  const [removingMember, setRemovingMember] = useState<string | null>(null);
+  const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
 
   const [flags, setFlags] = useState<Record<string, boolean>>({
     liveScoring: true, transferWindow: true, chat: true, polls: true,
@@ -501,6 +508,31 @@ export default function AdminPage() {
       showToast("success", "Prizes saved");
     } catch { showToast("error", "Failed to save prizes"); }
     finally { setSavingPrize(null); }
+  }
+
+  async function removeGroupMember(groupId: string, userId: string, username: string) {
+    if (!confirm(`Remove @${username} from this group?`)) return;
+    setRemovingMember(userId);
+    try {
+      const result = await adminRemoveLeagueMemberAction(groupId, userId);
+      if (result.error) { showToast("error", result.error); return; }
+      setAllGroups(prev => prev.map(g => g.id === groupId ? { ...g, members: g.members.filter(m => m.userId !== userId) } : g));
+      showToast("success", `Removed @${username}`);
+    } catch { showToast("error", "Failed to remove member"); }
+    finally { setRemovingMember(null); }
+  }
+
+  async function deleteGroup(groupId: string, name: string, memberCount: number) {
+    if (!confirm(`Delete "${name}" and remove all ${memberCount} members? This can't be undone.`)) return;
+    setDeletingGroupId(groupId);
+    try {
+      const result = await deleteLeagueAction(groupId);
+      if (result.error) { showToast("error", result.error); return; }
+      setAllGroups(prev => prev.filter(g => g.id !== groupId));
+      setPublicLeagues(prev => prev.filter(l => l.id !== groupId));
+      showToast("success", "Group deleted");
+    } catch { showToast("error", "Failed to delete group"); }
+    finally { setDeletingGroupId(null); }
   }
 
   async function toggleInjury(id: string, current: boolean) {
@@ -1252,6 +1284,100 @@ export default function AdminPage() {
           )}
           {activeTab === "leagues" && (
             <motion.div key="leagues" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4">
+              <div className="glass-card p-5">
+                <div className="flex items-center gap-2 mb-1">
+                  <ShieldAlert className="w-4 h-4 text-zff-green" />
+                  <h2 className="font-bold text-zff-black">All Groups</h2>
+                  {allGroups.length > 0 && <span className="ml-auto text-xs text-muted-foreground">{allGroups.length} groups</span>}
+                </div>
+                <p className="text-xs text-muted-foreground mb-6">Every group on the platform, public and private, for moderation. Expand a group to see its full member list.</p>
+
+                {groupsLoading ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">Loading…</p>
+                ) : allGroups.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">No groups yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {allGroups.map((group) => {
+                      const isExpanded = expandedGroupId === group.id;
+                      return (
+                        <div key={group.id} className="border border-slate-200 rounded-2xl overflow-hidden">
+                          <button
+                            onClick={() => setExpandedGroupId(isExpanded ? null : group.id)}
+                            className="w-full flex items-center justify-between gap-3 p-4 hover:bg-slate-50 transition-colors text-left"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                                group.type === "public" ? "bg-zff-green/10" : "bg-slate-100")}>
+                                {group.type === "public" ? <Globe className="w-4 h-4 text-zff-green" /> : <Lock className="w-4 h-4 text-slate-500" />}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-semibold text-zff-black truncate">{group.name}</p>
+                                  <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase shrink-0",
+                                    group.type === "public" ? "bg-zff-green/10 text-zff-green" : "bg-slate-100 text-muted-foreground")}>
+                                    {group.type}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  Owner @{group.ownerUsername} · {group.members.length} member{group.members.length === 1 ? "" : "s"} · code {group.inviteCode}
+                                </p>
+                              </div>
+                            </div>
+                            <ChevronDown className={cn("w-4 h-4 text-slate-400 shrink-0 transition-transform", isExpanded && "rotate-180")} />
+                          </button>
+
+                          {isExpanded && (
+                            <div className="border-t border-slate-200 bg-slate-50/50">
+                              {group.members.length === 0 ? (
+                                <p className="text-sm text-muted-foreground text-center py-6">No members.</p>
+                              ) : (
+                                <div className="divide-y divide-slate-100">
+                                  {group.members.map((m) => (
+                                    <div key={m.userId} className="flex items-center gap-3 px-4 py-2.5">
+                                      <div className="w-7 h-7 rounded-full bg-zff-green/10 flex items-center justify-center text-[10px] font-bold text-zff-green shrink-0 overflow-hidden">
+                                        {m.avatarUrl ? <img src={m.avatarUrl} alt="" className="w-full h-full object-cover" /> : m.username.slice(0, 2).toUpperCase()}
+                                      </div>
+                                      <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                                        <span className="text-sm text-zff-black truncate">@{m.username}</span>
+                                        {m.userId === group.ownerId && (
+                                          <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full shrink-0">OWNER</span>
+                                        )}
+                                        {["admin", "manager", "moderator"].includes(m.role) && m.userId !== group.ownerId && (
+                                          <span className="text-[9px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-full shrink-0 capitalize">{m.role}</span>
+                                        )}
+                                      </div>
+                                      {m.userId !== group.ownerId && (
+                                        <button
+                                          onClick={() => removeGroupMember(group.id, m.userId, m.username)}
+                                          disabled={removingMember === m.userId}
+                                          className="text-[10px] font-semibold text-red-400 hover:text-red-500 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 shrink-0"
+                                        >
+                                          <UserMinus className="w-3 h-3" /> {removingMember === m.userId ? "…" : "Remove"}
+                                        </button>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              <div className="flex justify-end p-3 border-t border-slate-200">
+                                <button
+                                  onClick={() => deleteGroup(group.id, group.name, group.members.length)}
+                                  disabled={deletingGroupId === group.id}
+                                  className="text-xs font-semibold text-red-400 hover:text-red-500 flex items-center gap-1.5 disabled:opacity-50"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" /> {deletingGroupId === group.id ? "Deleting…" : "Delete Group"}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               <div className="glass-card p-5">
                 <div className="flex items-center gap-2 mb-1">
                   <Globe className="w-4 h-4 text-zff-green" />
