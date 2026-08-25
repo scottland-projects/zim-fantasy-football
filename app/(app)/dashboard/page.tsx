@@ -23,7 +23,12 @@ const SPORT_TABS: { id: Sport; label: string; emoji: string }[] = [
   { id: "rugby",    label: "Rugby",    emoji: "🏉" },
 ];
 
-interface DisplayMatch { home: string; away: string; date: string; time: string; matchday: number; isLive: boolean; homeScore: number | null; awayScore: number | null }
+interface DisplayMatch { home: string; away: string; date: string; time: string; matchday: number; isLive: boolean; homeScore: number | null; awayScore: number | null; country: string }
+
+// This widget's "next 30 across all sports" query can now surface a mix of
+// Zimbabwe/South Africa/Botswana fixtures within the same sport slot, so a
+// flag per match is how a user tells at a glance which league it's from.
+const COUNTRY_FLAGS: Record<string, string> = { Zimbabwe: "🇿🇼", "South Africa": "🇿🇦", Botswana: "🇧🇼" };
 
 const ACTIVITY_CONFIG: Record<string, { icon: LucideIcon; bg: string; color: string }> = {
   goal:        { icon: Zap,        bg: "bg-blue-50",   color: "text-blue-500" },
@@ -198,7 +203,7 @@ export default function DashboardPage() {
           const bySport: Record<Sport, DisplayMatch[]> = { football: [], cricket: [], rugby: [] };
           for (const m of allMatches as {
             sport: Sport; home_team: string; away_team: string; kickoff_time: string;
-            matchday: number; status: string; home_score: number | null; away_score: number | null;
+            matchday: number; status: string; home_score: number | null; away_score: number | null; country: string;
           }[]) {
             if (bySport[m.sport].length >= 3) continue;
             bySport[m.sport].push({
@@ -210,6 +215,7 @@ export default function DashboardPage() {
               isLive: m.status === "live",
               homeScore: m.home_score,
               awayScore: m.away_score,
+              country: m.country ?? "Zimbabwe",
             });
           }
           setMatchesBySport(bySport);
@@ -473,7 +479,9 @@ export default function DashboardPage() {
                 {displayMatches.map((m, i) => (
                   <div key={i} className={cn("p-4 rounded-xl border", m.isLive ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-200")}>
                     <div className="flex items-center justify-between mb-2.5">
-                      <span className="text-xs text-zff-green font-semibold">MD{m.matchday}</span>
+                      <span className="text-xs text-zff-green font-semibold flex items-center gap-1">
+                        <span title={m.country}>{COUNTRY_FLAGS[m.country] ?? ""}</span> MD{m.matchday}
+                      </span>
                       <div className="flex items-center gap-2">
                         {m.isLive && (
                           <span className="live-badge text-[10px]">

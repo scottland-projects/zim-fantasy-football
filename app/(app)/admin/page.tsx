@@ -26,7 +26,12 @@ interface AdminMatch {
   matchday: number;
   season: string;
   sport: "football" | "cricket" | "rugby";
+  country: string;
 }
+
+// The unfiltered admin match list mixes all countries in one list per
+// sport, so a flag badge per row is how admins tell them apart at a glance.
+const COUNTRY_FLAGS: Record<string, string> = { Zimbabwe: "🇿🇼", "South Africa": "🇿🇦", Botswana: "🇧🇼" };
 
 interface PlayerStatRow {
   player_id: string;
@@ -1151,7 +1156,9 @@ export default function AdminPage() {
                     <div className="flex items-center gap-2 sm:gap-4">
                       {/* Matchday + date */}
                       <div className="w-14 sm:w-24 shrink-0">
-                        <p className="text-xs font-bold text-zff-green">MD{m.matchday}</p>
+                        <p className="text-xs font-bold text-zff-green flex items-center gap-1">
+                          <span title={m.country ?? "Zimbabwe"}>{COUNTRY_FLAGS[m.country ?? "Zimbabwe"] ?? ""}</span> MD{m.matchday}
+                        </p>
                         <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
                           {new Date(m.kickoff_time).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
                           <span className="hidden sm:inline"> · {new Date(m.kickoff_time).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span>

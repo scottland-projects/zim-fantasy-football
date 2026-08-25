@@ -274,7 +274,9 @@ export default function MatchStatsPage() {
                   className="p-4 rounded-xl border bg-slate-50 border-slate-200"
                 >
                   <div className="flex items-center justify-between mb-2.5">
-                    <span className="text-xs text-zff-green font-semibold">MD{m.matchday}</span>
+                    <span className="text-xs text-zff-green font-semibold flex items-center gap-1">
+                      <span>{COUNTRY_FLAGS[country]}</span> MD{m.matchday}
+                    </span>
                     <div className="flex items-center gap-2">
                       {m.status === "finished"
                         ? <span className="text-xs text-muted-foreground flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-green-400" />{dateStr}</span>

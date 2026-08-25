@@ -392,7 +392,9 @@ function PredictionsPageContent() {
                     return (
                       <div key={m.id} className={cn("p-4 rounded-xl border", isSaved ? "bg-zff-green/5 border-zff-green/20" : "bg-slate-50 border-slate-200")}>
                         <div className="flex items-center justify-between mb-3">
-                          <span className="text-xs text-zff-green font-semibold">MD{m.matchday}</span>
+                          <span className="text-xs text-zff-green font-semibold flex items-center gap-1">
+                            <span>{COUNTRY_FLAGS[country]}</span> MD{m.matchday}
+                          </span>
                           <span className="text-xs text-muted-foreground">
                             {new Date(m.kickoff_time).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                           </span>
