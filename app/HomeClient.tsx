@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Logo } from "@/components/ui/Logo";
 import { motion } from "framer-motion";
-import { Trophy, Zap, Users, ChevronRight, Shield, Target } from "lucide-react";
+import { Trophy, Zap, Users, ChevronRight, Target } from "lucide-react";
 
 const features = [
   { icon: Target, title: "Score Predictions", desc: "Predict match scores across football, cricket & rugby — no squad required" },
@@ -44,11 +44,6 @@ export default function HomeClient() {
       <section className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 lg:px-10 pt-2 sm:pt-3 lg:pt-4 pb-16 sm:pb-24 text-center">
         <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
           <Logo size={340} className="mx-auto mb-1" />
-
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zff-green/10 border border-zff-green/20 text-zff-green text-sm font-medium mb-8">
-            <Shield className="w-4 h-4" />
-            Made for African Sports Fans
-          </div>
 
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-display tracking-wider text-zff-black mb-4">
             AFRICA <span className="text-gradient-green">FANTASY</span>
