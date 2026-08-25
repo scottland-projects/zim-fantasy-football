@@ -54,7 +54,7 @@ export default function HomeClient() {
             AFRICA <span className="text-gradient-green">FANTASY</span>
           </h1>
 
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-12 leading-relaxed">
+          <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-12 leading-relaxed">
             Predict match results or build a fantasy squad across football, cricket, and rugby.
             Compete with fans nationwide. Real clubs, real points, pure passion.
           </p>
