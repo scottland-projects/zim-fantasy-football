@@ -51,9 +51,7 @@ export default function HomeClient() {
           </div>
 
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-display tracking-wider text-zff-black mb-4">
-            AFRICA
-            <br />
-            <span className="text-gradient-green">FANTASY</span>
+            AFRICA <span className="text-gradient-green">FANTASY</span>
           </h1>
 
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-12 leading-relaxed">
