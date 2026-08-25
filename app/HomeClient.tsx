@@ -120,8 +120,7 @@ export default function HomeClient() {
         </p>
         <p className="text-xs text-muted-foreground mt-2 max-w-xl mx-auto px-4">
           Africa Fantasy is an independent fan platform and is not affiliated with, endorsed by, or officially
-          connected to ZIFA, the Premier Soccer League, Zimbabwe Cricket, Zimbabwe Rugby Union, or any
-          participating club.
+          connected to any sports organization or club.
         </p>
       </footer>
     </div>
