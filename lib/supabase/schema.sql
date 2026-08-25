@@ -225,6 +225,15 @@ CREATE TABLE IF NOT EXISTS leagues (
 ALTER TABLE leagues ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Public leagues viewable by everyone" ON leagues FOR SELECT USING (type = 'public' OR owner_id = auth.uid());
+-- Without this, a non-owner MEMBER of a private league couldn't read that
+-- league's own row at all — the embedded `leagues(...)` join in
+-- refreshMyLeagues() came back null and got filtered out, so /leagues
+-- silently omitted any private group you'd joined but didn't own. Found via
+-- a user report ("I'm logged in as admin and can't see the private group
+-- I'm in") that turned out to affect every non-owner member, not just admin.
+CREATE POLICY "Members can view their leagues" ON leagues FOR SELECT USING (
+  EXISTS (SELECT 1 FROM league_members WHERE league_members.league_id = leagues.id AND league_members.user_id = auth.uid())
+);
 CREATE POLICY "Authenticated users create leagues" ON leagues FOR INSERT WITH CHECK (auth.uid() = owner_id);
 CREATE POLICY "Owners update leagues" ON leagues FOR UPDATE USING (auth.uid() = owner_id);
 CREATE POLICY "Admins update any league" ON leagues FOR UPDATE USING (
