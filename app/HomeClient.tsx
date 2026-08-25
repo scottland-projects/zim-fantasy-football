@@ -75,7 +75,7 @@ export default function HomeClient() {
             { value: "2,400+", label: "Active Members" },
             { value: "3", label: "Sports Covered" },
             { value: "Free", label: "To Play" },
-            { value: "Zimbabwe", label: "#1 Fan Platform" },
+            { value: "Africa", label: "#1 Fan Platform" },
           ].map((stat) => (
             <div key={stat.label} className="glass-card p-6 text-center">
               <p className="text-2xl font-display text-zff-green tracking-wider">{stat.value}</p>
