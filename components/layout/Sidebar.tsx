@@ -33,10 +33,10 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/my-team",   label: "My Team",       icon: Users,           flag: "fantasyTeams" },
   { href: "/market",    label: "Player Market", icon: ShoppingCart,    flag: "fantasyTeams" },
   { href: "/predictions", label: "Predictions", icon: Target,          flag: "scorePredictions" },
-  { href: "/live",      label: "Live Center",   icon: Zap,             flag: "liveScoring" },
   { href: "/chat",      label: "Chat",          icon: MessageCircle,   flag: "chat" },
   { href: "/polls",     label: "Polls",         icon: BarChart2,       flag: "polls" },
   { href: "/leagues",   label: "Groups",        icon: Trophy,          flag: null },
+  { href: "/live",      label: "Live Center",   icon: Zap,             flag: "liveScoring" },
   { href: "/profile",   label: "My Profile",    icon: User,            flag: null },
 ];
 
