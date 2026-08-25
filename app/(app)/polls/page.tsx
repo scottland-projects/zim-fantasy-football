@@ -8,8 +8,16 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useFeatureFlag } from "@/lib/hooks/useFeatureFlag";
 
+type CountryFilter = "All" | "Zimbabwe" | "South Africa" | "Botswana";
+const COUNTRY_FILTERS: { id: CountryFilter; flag: string }[] = [
+  { id: "All", flag: "🌍" },
+  { id: "Zimbabwe", flag: "🇿🇼" },
+  { id: "South Africa", flag: "🇿🇦" },
+  { id: "Botswana", flag: "🇧🇼" },
+];
+
 export default function PollsPage() {
-  const [pollData, setPollData] = useState<{ id: string; question: string; options: { label: string; votes: number }[]; totalVotes: number; voted: string | null; groupName: string | null }[]>([]);
+  const [pollData, setPollData] = useState<{ id: string; question: string; options: { label: string; votes: number }[]; totalVotes: number; voted: string | null; groupName: string | null; country: string | null }[]>([]);
   const [myGroups, setMyGroups] = useState<{ id: string; name: string }[]>([]);
   const [createPollOpen, setCreatePollOpen] = useState(false);
   const [pollForm, setPollForm] = useState<{ leagueId: string; question: string; options: string[] }>({ leagueId: "", question: "", options: ["", ""] });
@@ -17,6 +25,7 @@ export default function PollsPage() {
   const [pollFormError, setPollFormError] = useState("");
   const pollsEnabled = useFeatureFlag("polls");
   const [loading, setLoading] = useState(true);
+  const [countryFilter, setCountryFilter] = useState<CountryFilter>("All");
 
   useEffect(() => {
     const supabase = createClient();
@@ -30,7 +39,7 @@ export default function PollsPage() {
 
         const [{ data: pollsData }, { data: votesData }, { data: membershipRows }] = await Promise.all([
           sb.from("polls")
-            .select("id, question, options, votes, league_id")
+            .select("id, question, options, votes, league_id, country")
             .or("expires_at.is.null,expires_at.gt." + new Date().toISOString())
             .order("created_at", { ascending: false })
             .limit(12),
@@ -73,6 +82,7 @@ export default function PollsPage() {
             totalVotes: optsWithVotes.reduce((s: number, o: { votes: number }) => s + o.votes, 0),
             voted: myVotes[p.id] ?? null,
             groupName: p.league_id ? (groupNameById[p.league_id] ?? "Private Group") : null,
+            country: p.country ?? null,
           };
         }));
       } catch { /* keep empty */
@@ -145,7 +155,7 @@ export default function PollsPage() {
         setPollData(prev => [{
           id: data.poll_id, question: pollForm.question.trim(),
           options: options.map(label => ({ label, votes: 0 })),
-          totalVotes: 0, voted: null, groupName,
+          totalVotes: 0, voted: null, groupName, country: null,
         }, ...prev]);
       } else {
         setPollFormError(data?.error ?? "Couldn't create poll — try again");
@@ -154,11 +164,33 @@ export default function PollsPage() {
     finally { setCreatingPoll(false); }
   }
 
+  // Group polls and country-less opinion polls (e.g. "which sport are you
+  // most excited for") always show — they're either private to a group
+  // you're already in, or not about any one country in the first place.
+  const visiblePolls = countryFilter === "All"
+    ? pollData
+    : pollData.filter((p) => p.groupName || p.country === null || p.country === countryFilter);
+
   return (
     <div className="min-h-screen">
       <TopBar title="Fan Polls" subtitle="Vote on admin polls, or create your own for a group" />
 
       <div className="p-4 sm:p-6 lg:p-8">
+        <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit mb-4">
+          {COUNTRY_FILTERS.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setCountryFilter(c.id)}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5",
+                countryFilter === c.id ? "bg-white text-zff-black shadow-sm" : "text-muted-foreground hover:text-zff-black"
+              )}
+            >
+              <span>{c.flag}</span> {c.id}
+            </button>
+          ))}
+        </div>
+
         <div className="flex items-center justify-between mb-4">
           <p className="text-xs text-muted-foreground">Admin polls plus polls from your private groups</p>
           {myGroups.length > 0 && (
@@ -220,23 +252,32 @@ export default function PollsPage() {
           <div className="glass-card flex flex-col items-center justify-center py-16 px-6 text-center">
             <p className="text-sm text-muted-foreground">Loading polls…</p>
           </div>
-        ) : pollData.length === 0 ? (
+        ) : visiblePolls.length === 0 ? (
           <div className="glass-card flex flex-col items-center justify-center py-16 px-6 text-center">
             <BarChart2 className="w-10 h-10 text-slate-300 mb-3" />
-            <p className="text-sm font-semibold text-zff-black mb-1">No active polls right now</p>
+            <p className="text-sm font-semibold text-zff-black mb-1">
+              {pollData.length === 0 ? "No active polls right now" : `No ${countryFilter} polls right now`}
+            </p>
             <p className="text-xs text-muted-foreground">
-              {myGroups.length > 0 ? "Check back after the next matchday, or start one in your group." : "Check back after the next matchday — admins post fan polls here."}
+              {pollData.length > 0 ? "Try a different country, or check \"All\"." : myGroups.length > 0 ? "Check back after the next matchday, or start one in your group." : "Check back after the next matchday — admins post fan polls here."}
             </p>
           </div>
         ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {pollData.map((poll) => (
+          {visiblePolls.map((poll) => (
             <div key={poll.id} className="glass-card p-6">
-              {poll.groupName && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-zff-green bg-zff-green/10 border border-zff-green/20 rounded-full px-2 py-0.5 mb-3">
-                  <Lock className="w-2.5 h-2.5" /> {poll.groupName}
-                </span>
-              )}
+              <div className="flex items-center gap-2 mb-3 flex-wrap">
+                {poll.groupName && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-zff-green bg-zff-green/10 border border-zff-green/20 rounded-full px-2 py-0.5">
+                    <Lock className="w-2.5 h-2.5" /> {poll.groupName}
+                  </span>
+                )}
+                {poll.country && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-muted-foreground bg-slate-100 border border-slate-200 rounded-full px-2 py-0.5">
+                    {COUNTRY_FILTERS.find((c) => c.id === poll.country)?.flag} {poll.country}
+                  </span>
+                )}
+              </div>
               <h3 className="font-bold text-zff-black mb-4">{poll.question}</h3>
               <div className="space-y-3">
                 {poll.options.map((option) => {
