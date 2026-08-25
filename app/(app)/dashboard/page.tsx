@@ -12,6 +12,18 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { useFeatureFlag } from "@/lib/hooks/useFeatureFlag";
 
+type Sport = "football" | "cricket" | "rugby";
+
+const SPORT_ORDER: Sport[] = ["football", "cricket", "rugby"];
+
+const SPORT_TABS: { id: Sport; label: string; emoji: string }[] = [
+  { id: "football", label: "Football", emoji: "⚽" },
+  { id: "cricket",  label: "Cricket",  emoji: "🏏" },
+  { id: "rugby",    label: "Rugby",    emoji: "🏉" },
+];
+
+interface DisplayMatch { home: string; away: string; date: string; time: string; matchday: number; isLive: boolean; homeScore: number | null; awayScore: number | null }
+
 const ACTIVITY_CONFIG: Record<string, { icon: LucideIcon; bg: string; color: string }> = {
   goal:        { icon: Zap,        bg: "bg-blue-50",   color: "text-blue-500" },
   assist:      { icon: Target,     bg: "bg-indigo-50", color: "text-indigo-500" },
@@ -38,7 +50,18 @@ export default function DashboardPage() {
   const [season, setSeason] = useState("2026");
   const [leaderboard, setLeaderboard] = useState<{ rank: number; username: string; team: string; points: number; weekly: number; change: number }[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(true);
-  const [displayMatches, setDisplayMatches] = useState<{ home: string; away: string; date: string; time: string; matchday: number; isLive: boolean; homeScore: number | null; awayScore: number | null }[]>([]);
+  const [matchesBySport, setMatchesBySport] = useState<Record<Sport, DisplayMatch[]>>({ football: [], cricket: [], rugby: [] });
+  // Cycles through Football / Cricket / Rugby every 5s so all three sports'
+  // upcoming fixtures get airtime without needing three separate widgets —
+  // a manual tab click (below) also jumps straight to a sport.
+  const [activeSport, setActiveSport] = useState<Sport>("football");
+  useEffect(() => {
+    const id = setInterval(() => {
+      setActiveSport(prev => SPORT_ORDER[(SPORT_ORDER.indexOf(prev) + 1) % SPORT_ORDER.length]);
+    }, 5000);
+    return () => clearInterval(id);
+  }, []);
+  const displayMatches = matchesBySport[activeSport];
   const [recentActivity, setRecentActivity] = useState<{ id: string; type: string; title: string; text: string; pts: string; time: string }[]>([]);
   const [profile, setProfile] = useState<{ username: string; level: number; xp: number; avatarUrl: string | null; fantasyPoints: number } | null>(null);
   const [weeklyPoints, setWeeklyPoints]     = useState(0);
@@ -161,20 +184,23 @@ export default function DashboardPage() {
           })));
         }
 
-        // Upcoming / live matches
-        const { data: matches } = await sb
+        // Upcoming / live matches — all three sports, so the widget below
+        // can cycle through them instead of only ever showing football.
+        const { data: allMatches } = await sb
           .from("matches")
           .select("*")
-          .eq("sport", "football")
+          .in("sport", ["football", "cricket", "rugby"])
           .in("status", ["scheduled", "live"])
           .order("kickoff_time", { ascending: true })
-          .limit(3);
-        if (matches && matches.length > 0) {
-          setDisplayMatches(
-            matches.map((m: {
-              home_team: string; away_team: string; kickoff_time: string;
-              matchday: number; status: string; home_score: number | null; away_score: number | null;
-            }) => ({
+          .limit(30);
+        if (allMatches && allMatches.length > 0) {
+          const bySport: Record<Sport, DisplayMatch[]> = { football: [], cricket: [], rugby: [] };
+          for (const m of allMatches as {
+            sport: Sport; home_team: string; away_team: string; kickoff_time: string;
+            matchday: number; status: string; home_score: number | null; away_score: number | null;
+          }[]) {
+            if (bySport[m.sport].length >= 3) continue;
+            bySport[m.sport].push({
               home: m.home_team,
               away: m.away_team,
               date: new Date(m.kickoff_time).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }),
@@ -183,8 +209,9 @@ export default function DashboardPage() {
               isLive: m.status === "live",
               homeScore: m.home_score,
               awayScore: m.away_score,
-            }))
-          );
+            });
+          }
+          setMatchesBySport(bySport);
         }
         // Recent notifications as activity feed
         if (user) {
@@ -409,13 +436,29 @@ export default function DashboardPage() {
 
           <div className="space-y-5">
             <div className="glass-card p-6">
-              <h2 className="text-base font-bold text-zff-black mb-1 flex items-center gap-2.5">
-                <Calendar className="w-4 h-4 text-zff-green" /> Upcoming Football Matches
+              <h2 className="text-base font-bold text-zff-black mb-4 flex items-center gap-2.5">
+                <Calendar className="w-4 h-4 text-zff-green" /> Upcoming {SPORT_TABS.find(s => s.id === activeSport)?.label} Matches
               </h2>
-              <p className="text-xs text-muted-foreground mb-5">
-                Predicting cricket or rugby? <Link href="/predictions" className="text-zff-green font-semibold hover:underline">See those fixtures →</Link>
-              </p>
+              <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit mb-5">
+                {SPORT_TABS.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setActiveSport(s.id)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1",
+                      activeSport === s.id ? "bg-white text-zff-black shadow-sm" : "text-muted-foreground hover:text-zff-black"
+                    )}
+                  >
+                    <span>{s.emoji}</span> {s.label}
+                  </button>
+                ))}
+              </div>
               <div className="space-y-3">
+                {displayMatches.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    No upcoming {SPORT_TABS.find(s => s.id === activeSport)?.label.toLowerCase()} fixtures right now.
+                  </p>
+                )}
                 {displayMatches.map((m, i) => (
                   <div key={i} className={cn("p-4 rounded-xl border", m.isLive ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-200")}>
                     <div className="flex items-center justify-between mb-2.5">
