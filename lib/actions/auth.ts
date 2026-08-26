@@ -66,15 +66,22 @@ export async function phoneSignUpAction(email: string, password: string, usernam
 
 // Username-only signup — no email or phone collected at all. Same
 // pre-confirmed synthetic-email trick as the phone path above, keyed by
-// username instead. This means there is currently no account-recovery path
-// (no "forgot password") for these accounts short of an admin resetting it
-// via the Admin panel — a deliberate tradeoff for a simpler signup, not an
-// oversight.
-export async function usernameSignUpAction(username: string, password: string, fullName: string) {
+// username instead. Two required security questions (see
+// lib/recoveryQuestions.ts) replace the normal "email a reset link" flow,
+// which can't work here — there's no real address to send to. If storing
+// the questions fails after the account was already created, the account
+// is rolled back so the user gets a clean error and can just try again,
+// rather than being left with an unrecoverable account.
+export async function usernameSignUpAction(
+  username: string, password: string, fullName: string,
+  q1: string, a1: string, q2: string, a2: string
+) {
   const clean = username.trim().toLowerCase();
   if (!/^[a-z0-9_]{3,20}$/.test(clean)) {
     return { error: "Username must be 3-20 characters: letters, numbers, and underscores only." };
   }
+  if (!q1 || !q2 || q1 === q2) return { error: "Pick two different security questions." };
+  if (!a1.trim() || !a2.trim()) return { error: "Please answer both security questions." };
 
   const admin = serviceRole();
   const rateLimitError = await checkSignupRateLimit(admin);
@@ -88,7 +95,70 @@ export async function usernameSignUpAction(username: string, password: string, f
     user_metadata: { username: clean, full_name: fullName },
   });
   if (error) return { error: error.message.toLowerCase().includes("already") ? "That username is already taken." : "Unable to create account. Please try again." };
+
+  const { error: qError } = await admin.rpc("set_recovery_questions", {
+    p_user_id: data.user!.id, p_q1: q1, p_a1: a1, p_q2: q2, p_a2: a2,
+  });
+  if (qError) {
+    await admin.auth.admin.deleteUser(data.user!.id);
+    return { error: "Unable to create account. Please try again." };
+  }
+
   return { success: true, userId: data.user?.id, email };
+}
+
+const RECOVERY_MAX_ATTEMPTS = 8;
+const RECOVERY_WINDOW_MINUTES = 15;
+
+async function checkRecoveryRateLimit(admin: ReturnType<typeof serviceRole>, username: string): Promise<string | null> {
+  const since = new Date(Date.now() - RECOVERY_WINDOW_MINUTES * 60 * 1000).toISOString();
+  const { count } = await admin
+    .from("recovery_attempts")
+    .select("id", { count: "exact", head: true })
+    .eq("username", username)
+    .gte("created_at", since);
+
+  if ((count ?? 0) >= RECOVERY_MAX_ATTEMPTS) {
+    return `Too many attempts. Please wait ${RECOVERY_WINDOW_MINUTES} minutes and try again.`;
+  }
+  return null;
+}
+
+// Step 1 of account recovery — looks up which two questions a username set
+// at signup. Returns only the question text, never anything answer-related.
+export async function getRecoveryQuestionsAction(username: string) {
+  const clean = username.trim().toLowerCase();
+  if (!clean) return { error: "Enter your username" };
+
+  const admin = serviceRole();
+  const rateLimitError = await checkRecoveryRateLimit(admin, clean);
+  if (rateLimitError) return { error: rateLimitError };
+
+  const { data, error } = await admin.rpc("get_recovery_questions", { p_username: clean });
+  if (error || !data?.length) return { error: "No account found with that username, or it has no recovery questions set up." };
+  return { success: true, question1: data[0].question_1 as string, question2: data[0].question_2 as string };
+}
+
+// Step 2 — verifies both answers and, if correct, sets a new password
+// directly via the Admin API (verify_recovery_answers never touches
+// auth.users itself, just returns the user id on a match).
+export async function recoverAccountAction(username: string, answer1: string, answer2: string, newPassword: string) {
+  if (!newPassword || newPassword.length < 8) return { error: "Password must be at least 8 characters" };
+
+  const clean = username.trim().toLowerCase();
+  const admin = serviceRole();
+  const rateLimitError = await checkRecoveryRateLimit(admin, clean);
+  if (rateLimitError) return { error: rateLimitError };
+
+  await admin.from("recovery_attempts").insert({ username: clean });
+
+  const { data: userId, error } = await admin.rpc("verify_recovery_answers", { p_username: clean, p_a1: answer1, p_a2: answer2 });
+  if (error || !userId) return { error: "One or both answers are incorrect." };
+
+  const { error: updateError } = await admin.auth.admin.updateUserById(userId as string, { password: newPassword });
+  if (updateError) return { error: "Unable to reset password. Please try again." };
+
+  return { success: true };
 }
 
 export async function signUp(formData: FormData) {
