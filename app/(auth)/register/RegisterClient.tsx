@@ -111,39 +111,43 @@ export default function RegisterClient() {
       </div>
       {error && <div className="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">{error}</div>}
       <form onSubmit={handleSubmit} className="space-y-5">
-        <div>
-          <label className="label">Full Name</label>
-          <div className="relative"><User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="text" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} placeholder="Tendai Moyo" required className="input pl-10" /></div>
-        </div>
-        <div>
-          <label className="label">Username</label>
-          <div className="relative"><span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">@</span><input type="text" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="tinashe_23" required minLength={3} maxLength={20} pattern="[a-zA-Z0-9_]+" title="Letters, numbers, and underscores only" className="input pl-8" /></div>
-        </div>
-        <div>
-          <label className="label">Password</label>
-          <div className="relative"><Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="At least 8 characters" required minLength={8} className="input pl-10" /></div>
-        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+          <div className="space-y-5">
+            <div>
+              <label className="label">Full Name</label>
+              <div className="relative"><User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="text" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} placeholder="Tendai Moyo" required className="input pl-10" /></div>
+            </div>
+            <div>
+              <label className="label">Username</label>
+              <div className="relative"><span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">@</span><input type="text" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="tinashe_23" required minLength={3} maxLength={20} pattern="[a-zA-Z0-9_]+" title="Letters, numbers, and underscores only" className="input pl-8" /></div>
+            </div>
+            <div>
+              <label className="label">Password</label>
+              <div className="relative"><Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="At least 8 characters" required minLength={8} className="input pl-10" /></div>
+            </div>
+          </div>
 
-        <div className="pt-1 border-t border-slate-100">
-          <p className="text-xs font-semibold text-zff-black mt-4 mb-1.5 flex items-center gap-1.5">
-            <HelpCircle className="w-3.5 h-3.5 text-zff-green" /> Security Questions
-          </p>
-          <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-            These are the only way to recover your account if you forget your password — we can&apos;t help beyond them, so
-            {" "}<span className="font-medium text-zff-black">keep your answers to yourself</span>. If our suggested questions
-            feel too easy to guess, use &quot;Write my own&quot; to set your own instead.
-          </p>
-          <div className="space-y-4">
-            <QuestionField
-              label="Question 1" question={form.q1} answer={form.a1} otherQuestion={form.q2}
-              onQuestionChange={(q) => setForm({ ...form, q1: q })}
-              onAnswerChange={(a) => setForm({ ...form, a1: a })}
-            />
-            <QuestionField
-              label="Question 2" question={form.q2} answer={form.a2} otherQuestion={form.q1}
-              onQuestionChange={(q) => setForm({ ...form, q2: q })}
-              onAnswerChange={(a) => setForm({ ...form, a2: a })}
-            />
+          <div className="md:border-l md:border-slate-100 md:pl-6">
+            <p className="text-xs font-semibold text-zff-black mb-1.5 flex items-center gap-1.5">
+              <HelpCircle className="w-3.5 h-3.5 text-zff-green" /> Security Questions
+            </p>
+            <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+              The only way to recover your account — we can&apos;t help beyond them, so
+              {" "}<span className="font-medium text-zff-black">keep your answers to yourself</span>. Feel free to
+              {" "}&quot;Write my own&quot; if our suggestions feel too easy to guess.
+            </p>
+            <div className="space-y-4">
+              <QuestionField
+                label="Question 1" question={form.q1} answer={form.a1} otherQuestion={form.q2}
+                onQuestionChange={(q) => setForm({ ...form, q1: q })}
+                onAnswerChange={(a) => setForm({ ...form, a1: a })}
+              />
+              <QuestionField
+                label="Question 2" question={form.q2} answer={form.a2} otherQuestion={form.q1}
+                onQuestionChange={(q) => setForm({ ...form, q2: q })}
+                onAnswerChange={(a) => setForm({ ...form, a2: a })}
+              />
+            </div>
           </div>
         </div>
 
