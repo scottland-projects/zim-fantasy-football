@@ -132,9 +132,9 @@ export default function RegisterClient() {
               <HelpCircle className="w-3.5 h-3.5 text-zff-green" /> Security Questions
             </p>
             <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-              The only way to recover your account — we can&apos;t help beyond them, so
-              {" "}<span className="font-medium text-zff-black">keep your answers to yourself</span>. Feel free to
-              {" "}&quot;Write my own&quot; if our suggestions feel too easy to guess.
+              This is your only way back into your account if you forget your password, so please
+              {" "}<span className="font-medium text-zff-black">keep your answers to yourself</span>. We won&apos;t be able
+              to recover it any other way. If our suggested questions feel too easy to guess, feel free to write your own.
             </p>
             <div className="space-y-4">
               <QuestionField
