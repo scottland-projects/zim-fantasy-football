@@ -83,9 +83,9 @@ export default function HomeClient() {
       </nav>
 
       {/* Hero */}
-      <section className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 lg:px-10 pt-2 sm:pt-3 lg:pt-4 pb-16 sm:pb-24 text-center">
+      <section className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 lg:px-10 pt-1 sm:pt-2 lg:pt-3 pb-16 sm:pb-24 text-center">
         <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-          <Logo size={340} className="mx-auto mb-1" />
+          <Logo size={340} className="mx-auto mb-0" />
 
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-display tracking-wider text-zff-black mb-4">
             AFRICA <span className="text-gradient-green">FANTASY</span>
