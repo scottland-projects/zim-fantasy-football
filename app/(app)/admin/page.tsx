@@ -1174,7 +1174,7 @@ export default function AdminPage() {
                       <div className="p-5 grid grid-cols-2 sm:grid-cols-3 gap-3">
                         <div>
                           <label className="text-xs font-medium text-muted-foreground mb-1 block">Sport *</label>
-                          <select value={fixtureForm.sport} onChange={e => setFixtureForm(p => ({ ...p, sport: e.target.value as typeof p.sport }))} className="input text-sm py-2 capitalize">
+                          <select value={fixtureForm.sport} onChange={e => setFixtureForm(p => ({ ...p, sport: e.target.value as typeof p.sport }))} className="select text-sm py-2 capitalize">
                             <option value="football">Football</option>
                             <option value="cricket">Cricket</option>
                             <option value="rugby">Rugby</option>
@@ -1936,13 +1936,13 @@ export default function AdminPage() {
                       <label className="text-[10px] text-muted-foreground font-medium block mb-1">Minute</label>
                       <input type="number" min="0" max="120" value={eventForm.minute}
                         onChange={e => setEventForm(p => ({ ...p, minute: e.target.value }))}
-                        placeholder="e.g. 11" className="input-field text-sm w-full" />
+                        placeholder="e.g. 11" className="input text-sm w-full" />
                     </div>
                     <div>
                       <label className="text-[10px] text-muted-foreground font-medium block mb-1">Event</label>
                       <select value={eventForm.event_type}
                         onChange={e => setEventForm(p => ({ ...p, event_type: e.target.value, player_id: "", player_name: "" }))}
-                        className="input-field text-sm w-full">
+                        className="select text-sm w-full">
                         <option value="goal">⚽ Goal</option>
                         <option value="own_goal">🔴 Own Goal</option>
                         <option value="assist">🎯 Assist</option>
@@ -1968,7 +1968,7 @@ export default function AdminPage() {
                         const p = matchPlayers.find(pl => pl.id === e.target.value);
                         setEventForm(prev => ({ ...prev, player_id: e.target.value, player_name: p?.name ?? "" }));
                       }}
-                      className="input-field text-sm w-full">
+                      className="select text-sm w-full">
                       <option value="">Select player…</option>
                       {["GK","DEF","MID","FWD"].map(pos => (
                         <optgroup key={pos} label={pos}>

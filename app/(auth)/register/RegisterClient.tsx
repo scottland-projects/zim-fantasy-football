@@ -45,7 +45,7 @@ function QuestionField({
           className="input text-sm"
         />
       ) : (
-        <select value={question} onChange={(e) => onQuestionChange(e.target.value)} className="input text-sm">
+        <select value={question} onChange={(e) => onQuestionChange(e.target.value)} className="select text-sm">
           {RECOVERY_QUESTIONS.map((q) => <option key={q} value={q}>{q}</option>)}
         </select>
       )}

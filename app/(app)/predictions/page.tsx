@@ -521,7 +521,7 @@ function PredictionsPageContent() {
                 </h2>
               </div>
               {groups.length > 0 && (
-                <select value={scopeId} onChange={(e) => setScopeId(e.target.value)} className="input text-xs py-1.5 mb-4 w-full">
+                <select value={scopeId} onChange={(e) => setScopeId(e.target.value)} className="select text-xs py-1.5 mb-4 w-full">
                   <option value="global">🌍 Global</option>
                   {groups.map((g) => <option key={g.id} value={g.id}>👥 {g.name}</option>)}
                 </select>

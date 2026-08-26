@@ -212,7 +212,7 @@ export default function PollsPage() {
               <div className="space-y-3">
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-1 block">Group</label>
-                  <select value={pollForm.leagueId} onChange={e => setPollForm(p => ({ ...p, leagueId: e.target.value }))} className="input text-sm py-2">
+                  <select value={pollForm.leagueId} onChange={e => setPollForm(p => ({ ...p, leagueId: e.target.value }))} className="select text-sm py-2">
                     {myGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                   </select>
                 </div>
