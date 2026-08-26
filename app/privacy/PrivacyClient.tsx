@@ -61,8 +61,9 @@ function PrivacyPolicyContent() {
             <h2 className="text-base font-bold text-zff-black mb-3">2A. Public Sports Information (Not Personal Data)</h2>
             <p className="mb-3">
               Separately from the personal data described in Section 2, the Platform displays factual sporting
-              information about real football, cricket, and rugby competitions in Zimbabwe, including club and team
-              names, competition and league names, fixture lists, matchdays, and results. This information:
+              information about real football, cricket, and rugby competitions across the African countries the
+              Platform covers, including club and team names, competition and league names, fixture lists,
+              matchdays, and results. This information:
             </p>
             <ul className="list-disc list-inside space-y-2 pl-2">
               <li>is drawn from what we understand to be publicly available knowledge of these competitions, not from any private or confidential source;</li>

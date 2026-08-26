@@ -28,11 +28,10 @@ function TermsOfServiceContent() {
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 mb-6 text-sm text-amber-900 leading-relaxed">
           <p className="font-bold mb-1">Independent fan platform: not affiliated with any club or league</p>
           <p>
-            Africa Fantasy is an independent fantasy sports platform created for Zimbabwean sports fans, covering
-            football, cricket, and rugby. It is not affiliated with, endorsed by, or officially connected to ZIFA,
-            the Premier Soccer League, Zimbabwe Cricket, Zimbabwe Rugby Union, or any participating club. All
-            third-party names and references are used solely to identify real-world teams and players where
-            legally permitted.
+            Africa Fantasy is an independent fantasy sports platform for football, cricket, and rugby fans across
+            Africa. It is not affiliated with, endorsed by, or officially connected to any sports governing body,
+            association, league, or participating club. All third-party names and references are used solely to
+            identify real-world teams and players where legally permitted.
           </p>
         </div>
 
@@ -57,10 +56,10 @@ function TermsOfServiceContent() {
             <h2 className="text-base font-bold text-zff-black mb-3">2. Nature of the Platform</h2>
             <p className="mb-3">
               Africa Fantasy is a fan-made fantasy sports platform covering football, cricket, and rugby clubs
-              across Zimbabwe. It is:
+              across Africa. It is:
             </p>
             <ul className="list-disc list-inside space-y-2 pl-2">
-              <li>Not affiliated with, endorsed by, sponsored by, or officially connected to ZIFA, the Premier Soccer League, Zimbabwe Cricket, Zimbabwe Rugby Union, or any real club.</li>
+              <li>Not affiliated with, endorsed by, sponsored by, or officially connected to any sports governing body, association, league, or real club.</li>
               <li>Built around original branding, scoring rules, and content; it does not use official club crests, kits, or copyrighted media.</li>
               <li>Free to enter. There is no pay-to-play entry fee, and the Platform does not operate any pooled-stake or betting mechanic.</li>
               <li>Funded by advertising and sponsorships; any prizes offered are provided or funded by sponsors, not paid out of user entry fees, because none are collected.</li>
@@ -112,7 +111,7 @@ function TermsOfServiceContent() {
             <p>
               Standings across every game mode are for entertainment purposes. The Platform does not accept
               monetary entry fees, does not operate as a bookmaker, and no feature of the Platform constitutes
-              gambling or betting as defined under Zimbabwean law.
+              gambling or betting under the laws of any jurisdiction in which it operates.
             </p>
           </section>
 
