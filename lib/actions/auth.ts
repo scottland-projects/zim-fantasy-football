@@ -66,37 +66,21 @@ export async function phoneSignUpAction(email: string, password: string, usernam
 
 // Username-only signup — no email or phone collected at all. Same
 // pre-confirmed synthetic-email trick as the phone path above, keyed by
-// username instead. Two required security questions (see
-// lib/recoveryQuestions.ts) replace the normal "email a reset link" flow,
-// which can't work here — there's no real address to send to. If storing
-// the questions fails after the account was already created, the account
-// is rolled back so the user gets a clean error and can just try again,
-// rather than being left with an unrecoverable account.
+// username instead. Security questions used to be collected here too, but
+// now happen as a skippable step right after signup (setRecoveryQuestionsAction
+// below) so a slow/fiddly step doesn't block account creation itself.
 // Every check below is re-validated here even though the form already
 // enforces most of it client-side — the client-side rules (minLength,
 // maxLength, pattern, disabled buttons) are only a UX convenience and are
 // trivially bypassed by anyone calling this server action directly (Burp
 // Suite, curl, a modified fetch call), so nothing here can be trusted to
 // have already been checked.
-export async function usernameSignUpAction(
-  username: string, password: string, fullName: string,
-  q1: string, a1: string, q2: string, a2: string
-) {
+export async function usernameSignUpAction(username: string, password: string, fullName: string) {
   const clean = username.trim().toLowerCase();
   if (!/^[a-z0-9_]{3,20}$/.test(clean)) {
     return { error: "Username must be 3-20 characters: letters, numbers, and underscores only." };
   }
   if (!password || password.length < 8) return { error: "Password must be at least 8 characters." };
-
-  const question1 = q1.trim(), question2 = q2.trim();
-  const answer1 = a1.trim(), answer2 = a2.trim();
-  if (question1.length < 6 || question1.length > 150 || question2.length < 6 || question2.length > 150) {
-    return { error: "Security questions must be 6-150 characters." };
-  }
-  if (question1.toLowerCase() === question2.toLowerCase()) return { error: "Pick two different security questions." };
-  if (!answer1 || answer1.length > 100 || !answer2 || answer2.length > 100) {
-    return { error: "Please answer both security questions (100 characters max)." };
-  }
 
   const admin = serviceRole();
   const rateLimitError = await checkSignupRateLimit(admin);
@@ -111,15 +95,62 @@ export async function usernameSignUpAction(
   });
   if (error) return { error: error.message.toLowerCase().includes("already") ? "That username is already taken." : "Unable to create account. Please try again." };
 
-  const { error: qError } = await admin.rpc("set_recovery_questions", {
-    p_user_id: data.user!.id, p_q1: question1, p_a1: answer1, p_q2: question2, p_a2: answer2,
-  });
-  if (qError) {
-    await admin.auth.admin.deleteUser(data.user!.id);
-    return { error: "Unable to create account. Please try again." };
+  return { success: true, userId: data.user?.id, email };
+}
+
+// Sets (or replaces) the current signed-in user's two recovery questions —
+// called both from the post-signup setup step and from Settings, so it
+// always operates on whoever's actual session this is, never a client-
+// supplied user id. Reuses the same set_recovery_questions RPC signup used
+// to call directly (ON CONFLICT DO UPDATE, so calling it again from
+// Settings cleanly overwrites the previous pair).
+export async function setRecoveryQuestionsAction(q1: string, a1: string, q2: string, a2: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase: any = await mkClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "You must be signed in." };
+
+  const question1 = q1.trim(), question2 = q2.trim();
+  const answer1 = a1.trim(), answer2 = a2.trim();
+  if (question1.length < 6 || question1.length > 150 || question2.length < 6 || question2.length > 150) {
+    return { error: "Security questions must be 6-150 characters." };
+  }
+  if (question1.toLowerCase() === question2.toLowerCase()) return { error: "Pick two different security questions." };
+  if (!answer1 || answer1.length > 100 || !answer2 || answer2.length > 100) {
+    return { error: "Please answer both security questions (100 characters max)." };
   }
 
-  return { success: true, userId: data.user?.id, email };
+  const admin = serviceRole();
+  const { error } = await admin.rpc("set_recovery_questions", {
+    p_user_id: user.id, p_q1: question1, p_a1: answer1, p_q2: question2, p_a2: answer2,
+  });
+  if (error) return { error: "Unable to save security questions. Please try again." };
+
+  return { success: true };
+}
+
+// Whether the current user has recovery questions set, and if so the
+// question text (never the answers — those stay hashed and one-way).
+// Used to show a "set up" vs "change" state in Settings and to warn a
+// freshly-registered user before they skip the setup step. Reads the
+// table directly via the service role rather than the RPCs above, which
+// are keyed by username for the logged-out recovery flow — this already
+// has the authenticated user id, no need to round-trip through a username.
+export async function getMyRecoveryQuestionsStatusAction() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase: any = await mkClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "You must be signed in." };
+
+  const admin = serviceRole();
+  const { data } = await admin
+    .from("recovery_questions")
+    .select("question_1, question_2")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!data) return { success: true, isSet: false as const };
+  return { success: true, isSet: true as const, question1: data.question_1 as string, question2: data.question_2 as string };
 }
 
 const RECOVERY_MAX_ATTEMPTS = 8;

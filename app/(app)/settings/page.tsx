@@ -2,9 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { TopBar } from "@/components/layout/TopBar";
-import { Bell, Shield, Palette, Save, Check, AlertTriangle, KeyRound, Eye, EyeOff, Target } from "lucide-react";
+import { Bell, Shield, Palette, Save, Check, AlertTriangle, KeyRound, Eye, EyeOff, Target, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { setRecoveryQuestionsAction, getMyRecoveryQuestionsStatusAction } from "@/lib/actions/auth";
+import { RECOVERY_QUESTIONS } from "@/lib/recoveryQuestions";
+import { QuestionField } from "@/components/security/QuestionField";
 
 const DEFAULT_SETTINGS = {
   notifications: {
@@ -73,6 +76,12 @@ export default function SettingsPage() {
   const [sports, setSports]               = useState<string[]>(["football"]);
   const [sportsSaving, setSportsSaving]   = useState(false);
   const [sportsSaved, setSportsSaved]     = useState(false);
+  const [secStatus, setSecStatus]         = useState<{ isSet: boolean; question1?: string; question2?: string } | null>(null);
+  const [secOpen, setSecOpen]             = useState(false);
+  const [secForm, setSecForm]             = useState({ q1: RECOVERY_QUESTIONS[0], a1: "", q2: RECOVERY_QUESTIONS[1], a2: "" });
+  const [secError, setSecError]           = useState("");
+  const [secSaving, setSecSaving]         = useState(false);
+  const [secDone, setSecDone]             = useState(false);
 
   // Load settings from Supabase on mount
   useEffect(() => {
@@ -103,6 +112,13 @@ export default function SettingsPage() {
           .eq("id", user.id)
           .maybeSingle();
         if (profile?.interested_sports?.length > 0) setSports(profile.interested_sports);
+
+        const secResult = await getMyRecoveryQuestionsStatusAction();
+        if (secResult.success) {
+          setSecStatus(secResult.isSet
+            ? { isSet: true, question1: secResult.question1, question2: secResult.question2 }
+            : { isSet: false });
+        }
       } catch { /* use defaults */ }
       finally { setLoading(false); }
     }
@@ -180,6 +196,38 @@ export default function SettingsPage() {
       setTimeout(() => setPwDone(false), 3000);
     } catch { setPwError("Something went wrong — please try again"); }
     finally { setPwSaving(false); }
+  }
+
+  function openSecForm() {
+    // Prefill the question text if already set (never the answers — those
+    // are one-way hashed and never sent back to the client), so changing
+    // just one question doesn't force re-picking both from scratch.
+    setSecForm({
+      q1: secStatus?.question1 ?? RECOVERY_QUESTIONS[0], a1: "",
+      q2: secStatus?.question2 ?? RECOVERY_QUESTIONS[1], a2: "",
+    });
+    setSecError("");
+    setSecOpen(true);
+  }
+
+  async function saveSecurityQuestions() {
+    setSecError("");
+    if (secForm.q1.trim().toLowerCase() === secForm.q2.trim().toLowerCase()) {
+      setSecError("Pick two different security questions"); return;
+    }
+    if (!secForm.a1.trim() || !secForm.a2.trim()) {
+      setSecError("Please answer both security questions"); return;
+    }
+    setSecSaving(true);
+    try {
+      const result = await setRecoveryQuestionsAction(secForm.q1.trim(), secForm.a1, secForm.q2.trim(), secForm.a2);
+      if (result.error) { setSecError(result.error); return; }
+      setSecStatus({ isSet: true, question1: secForm.q1.trim(), question2: secForm.q2.trim() });
+      setSecOpen(false);
+      setSecDone(true);
+      setTimeout(() => setSecDone(false), 3000);
+    } catch { setSecError("Something went wrong — please try again"); }
+    finally { setSecSaving(false); }
   }
 
 
@@ -355,6 +403,53 @@ export default function SettingsPage() {
                   <button onClick={changePassword} disabled={pwSaving}
                     className="btn-primary text-sm py-2 px-4 flex-1 disabled:opacity-60">
                     {pwSaving ? "Updating…" : "Update Password"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Security questions — account recovery */}
+          <div className="mt-6 pt-6 border-t border-slate-100">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-sm font-semibold text-zff-black flex items-center gap-2">
+                <HelpCircle className="w-4 h-4 text-zff-green" /> Security Questions
+              </h3>
+              {secStatus && (
+                secStatus.isSet
+                  ? <span className="text-xs text-zff-green font-medium flex items-center gap-1"><Check className="w-3 h-3" /> Set up</span>
+                  : <span className="text-xs text-amber-600 font-medium flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Not set up</span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              These are the only way to reset your password and recover your account, since your
+              account isn&apos;t linked to an email or phone number.
+              {secStatus && !secStatus.isSet && " Set them up so you're never locked out."}
+            </p>
+
+            {!secOpen ? (
+              <button onClick={openSecForm} className="btn-outline w-full text-sm py-2.5 flex items-center justify-center gap-2">
+                <HelpCircle className="w-4 h-4" />
+                {secDone ? "✓ Security questions updated" : secStatus?.isSet ? "Change Security Questions" : "Set Up Security Questions"}
+              </button>
+            ) : (
+              <div className="border border-slate-200 rounded-xl p-4 space-y-4 bg-slate-50/50">
+                <QuestionField
+                  label="Question 1" question={secForm.q1} answer={secForm.a1} otherQuestion={secForm.q2}
+                  onQuestionChange={(q) => setSecForm({ ...secForm, q1: q })}
+                  onAnswerChange={(a) => setSecForm({ ...secForm, a1: a })}
+                />
+                <QuestionField
+                  label="Question 2" question={secForm.q2} answer={secForm.a2} otherQuestion={secForm.q1}
+                  onQuestionChange={(q) => setSecForm({ ...secForm, q2: q })}
+                  onAnswerChange={(a) => setSecForm({ ...secForm, a2: a })}
+                />
+                {secError && <p className="text-xs text-red-400 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" />{secError}</p>}
+                <div className="flex gap-2 pt-1">
+                  <button onClick={() => setSecOpen(false)} className="btn-outline text-sm py-2 px-4 flex-1">Cancel</button>
+                  <button onClick={saveSecurityQuestions} disabled={secSaving}
+                    className="btn-primary text-sm py-2 px-4 flex-1 disabled:opacity-60">
+                    {secSaving ? "Saving…" : "Save Questions"}
                   </button>
                 </div>
               </div>
