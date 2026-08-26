@@ -12,7 +12,6 @@ const DEFAULT_SETTINGS = {
     predictionReminders: true,
     transferDeadlines:   true,
     goalAlerts:          true,
-    groupInvites:        true,
     rewardUnlocks:       true,
     weeklyDigest:        true,
   },
@@ -27,11 +26,10 @@ const DEFAULT_SETTINGS = {
 type Settings = typeof DEFAULT_SETTINGS;
 
 const NOTIF_LABELS: Record<string, { label: string; desc: string }> = {
-  matchReminders:      { label: "Match Reminders",       desc: "Get notified before a match you follow kicks off" },
+  matchReminders:      { label: "Match Reminders",       desc: "Get notified when a match you follow kicks off or wraps up" },
   predictionReminders:  { label: "Prediction Reminders",  desc: "Get notified when a prediction is about to close" },
   transferDeadlines:   { label: "Transfer Deadline Alerts", desc: "Alerts when the fantasy transfer window closes" },
   goalAlerts:          { label: "Live Fantasy Alerts",    desc: "Instant alerts for your fantasy players' key moments" },
-  groupInvites:        { label: "Group Invitations",      desc: "Notify when someone invites you to a private group" },
   rewardUnlocks:       { label: "Achievement Unlocks",    desc: "Celebrate when you earn a badge" },
   weeklyDigest:        { label: "Weekly Digest",          desc: "Summary of your performance each week" },
 };
@@ -276,7 +274,7 @@ export default function SettingsPage() {
             <Bell className="w-4 h-4 text-zff-green" /> Notification Preferences
           </h2>
           <div className="space-y-4">
-            {Object.entries(settings.notifications).map(([key, value]) => {
+            {Object.entries(settings.notifications).filter(([key]) => key !== "groupInvites").map(([key, value]) => {
               const meta = NOTIF_LABELS[key];
               return (
                 <div key={key} className="flex items-center justify-between gap-4 py-2 border-b border-slate-100 last:border-0">

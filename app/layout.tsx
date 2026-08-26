@@ -3,13 +3,13 @@ import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://africa-fantasy-club.vercel.app"),
   title: "Africa Fantasy",
-  description: "The home for football, cricket and rugby predictions and fantasy gaming across Zimbabwe",
+  description: "The home for football, cricket and rugby predictions and fantasy gaming across Africa",
   openGraph: {
     title: "Africa Fantasy",
-    description: "The home for football, cricket and rugby predictions and fantasy gaming across Zimbabwe",
-    // TODO: add a real og-image.png (1200x630) to public/ before launch —
-    // intentionally omitted rather than pointing at a placeholder asset.
+    description: "The home for football, cricket and rugby predictions and fantasy gaming across Africa",
+    images: [{ url: "/og-image.png", width: 1200, height: 630 }],
   },
   // iOS ignores app/manifest.ts for home-screen behaviour — it needs its
   // own apple-mobile-web-app-* meta tags to launch standalone (no Safari

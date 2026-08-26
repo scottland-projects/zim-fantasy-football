@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { TopBar } from "@/components/layout/TopBar";
 import { Radio, Trophy, Edit, Plus, Zap, X, Clock, CheckCircle, XCircle } from "lucide-react";
 import { cn, getPositionColor } from "@/lib/utils";
-import { cancelMatchLiveAction, logMatchEventAction, deleteMatchEventAction, reopenMatchAction } from "@/lib/actions/admin";
+import { cancelMatchLiveAction, logMatchEventAction, deleteMatchEventAction, reopenMatchAction, togglePlayerInjuryAction } from "@/lib/actions/admin";
 import { useFeatureFlag } from "@/lib/hooks/useFeatureFlag";
 import { FeatureDisabled } from "@/components/ui/FeatureDisabled";
 
@@ -277,10 +277,8 @@ export default function ManagerPage() {
   async function toggleInjury(id: string, current: boolean) {
     setTogglingInjury(id);
     try {
-      const supabase = createClient();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any).from("players").update({ is_injured: !current }).eq("id", id);
-      setPlayers(prev => prev.map(p => p.id === id ? { ...p, is_injured: !current } : p));
+      const result = await togglePlayerInjuryAction(id, !current);
+      if (result.success) setPlayers(prev => prev.map(p => p.id === id ? { ...p, is_injured: !current } : p));
     } finally { setTogglingInjury(null); }
   }
 

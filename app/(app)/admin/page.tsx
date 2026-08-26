@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { saveFlagsAction, updateMatchStatusAction, cancelMatchLiveAction, saveFixtureAction, saveMatchStatsAction, savePrizesAction, updateUserRoleAction, broadcastNotificationAction, addPlayerAction, editPlayerAction, deletePlayerAction, adminResetPasswordAction, logMatchEventAction, deleteMatchEventAction, reopenMatchAction, listUserEmailsAction, finishPredictionOnlyMatchAction, reopenPredictionOnlyMatchAction, goLivePredictionOnlyMatchAction, updateLiveScorePredictionOnlyAction, getAllLeaguesForModerationAction, adminRemoveLeagueMemberAction } from "@/lib/actions/admin";
+import { saveFlagsAction, updateMatchStatusAction, cancelMatchLiveAction, saveFixtureAction, saveMatchStatsAction, savePrizesAction, updateUserRoleAction, broadcastNotificationAction, addPlayerAction, editPlayerAction, deletePlayerAction, adminResetPasswordAction, logMatchEventAction, deleteMatchEventAction, reopenMatchAction, listUserEmailsAction, finishPredictionOnlyMatchAction, reopenPredictionOnlyMatchAction, goLivePredictionOnlyMatchAction, updateLiveScorePredictionOnlyAction, getAllLeaguesForModerationAction, adminRemoveLeagueMemberAction, grantXpAction, recalculateSingleTeamAction } from "@/lib/actions/admin";
 import { deleteLeagueAction } from "@/lib/actions/leagues";
 import { motion, AnimatePresence } from "framer-motion";
 import { TopBar } from "@/components/layout/TopBar";
@@ -226,6 +226,13 @@ export default function AdminPage() {
   const [resetPwForm, setResetPwForm] = useState({ next: "", confirm: "" });
   const [resetPwError, setResetPwError] = useState("");
   const [resetPwSaving, setResetPwSaving] = useState(false);
+  const [grantXpUser, setGrantXpUser] = useState<{ id: string; username: string } | null>(null);
+  const [grantXpAmount, setGrantXpAmount] = useState("");
+  const [grantXpError, setGrantXpError] = useState("");
+  const [grantXpSaving, setGrantXpSaving] = useState(false);
+  const [recalcForm, setRecalcForm] = useState({ username: "", matchday: "", season: "2026" });
+  const [recalcSaving, setRecalcSaving] = useState(false);
+  const [recalcMessage, setRecalcMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [togglingInjury, setTogglingInjury] = useState<string | null>(null);
 
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
@@ -572,6 +579,35 @@ export default function AdminPage() {
     finally { setResetPwSaving(false); }
   }
 
+  async function recalcSingleTeam() {
+    setRecalcMessage(null);
+    const matchday = parseInt(recalcForm.matchday, 10);
+    if (!recalcForm.username.trim() || isNaN(matchday)) { setRecalcMessage({ type: "error", text: "Enter a username and matchday" }); return; }
+    setRecalcSaving(true);
+    try {
+      const result = await recalculateSingleTeamAction(recalcForm.username.trim(), matchday, recalcForm.season);
+      if (result.error) { setRecalcMessage({ type: "error", text: result.error }); return; }
+      setRecalcMessage({ type: "success", text: `@${recalcForm.username.trim()} now has ${result.points} points for MD${matchday}` });
+    } catch { setRecalcMessage({ type: "error", text: "Something went wrong" }); }
+    finally { setRecalcSaving(false); }
+  }
+
+  async function grantXp() {
+    setGrantXpError("");
+    if (!grantXpUser) return;
+    const amount = parseInt(grantXpAmount, 10);
+    if (isNaN(amount) || amount < 1) { setGrantXpError("Enter a whole number of XP"); return; }
+    setGrantXpSaving(true);
+    try {
+      const result = await grantXpAction(grantXpUser.id, amount);
+      if (result.error) { setGrantXpError(result.error); return; }
+      showToast("success", `Granted ${amount} XP to @${grantXpUser.username}`);
+      setGrantXpUser(null);
+      setGrantXpAmount("");
+    } catch { setGrantXpError("Something went wrong"); }
+    finally { setGrantXpSaving(false); }
+  }
+
   async function saveEdit() {
     if (!editForm) return;
     setSavingEdit(true);
@@ -915,6 +951,11 @@ export default function AdminPage() {
                           title="Reset password">
                           <KeyRound className="w-3.5 h-3.5" />
                         </button>
+                        <button onClick={() => { setGrantXpUser({ id: user.userId, username: user.username }); setGrantXpAmount(""); setGrantXpError(""); }}
+                          className="p-1.5 rounded-lg border border-slate-200 hover:border-zff-green/50 text-muted-foreground hover:text-zff-green transition-colors"
+                          title="Grant XP">
+                          <Zap className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -981,6 +1022,11 @@ export default function AdminPage() {
                                   className="p-1.5 rounded-lg border border-slate-200 hover:border-amber-400/50 text-muted-foreground hover:text-amber-500 transition-colors"
                                   title="Reset password">
                                   <KeyRound className="w-3.5 h-3.5" />
+                                </button>
+                                <button onClick={() => { setGrantXpUser({ id: user.userId, username: user.username }); setGrantXpAmount(""); setGrantXpError(""); }}
+                                  className="p-1.5 rounded-lg border border-slate-200 hover:border-zff-green/50 text-muted-foreground hover:text-zff-green transition-colors"
+                                  title="Grant XP">
+                                  <Zap className="w-3.5 h-3.5" />
                                 </button>
                               </div>
                             </div>
@@ -1077,6 +1123,23 @@ export default function AdminPage() {
 
           {activeTab === "matches" && (
             <motion.div key="matches" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-5">
+              <div className="glass-card p-5">
+                <h2 className="font-bold text-zff-black mb-1">Fix One Team&apos;s Points</h2>
+                <p className="text-xs text-muted-foreground mb-4">Recalculates a single fantasy team&apos;s points for one matchday — for e.g. a late transfer, without redoing the whole matchday.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <input value={recalcForm.username} onChange={e => setRecalcForm(p => ({ ...p, username: e.target.value }))}
+                    placeholder="Username" className="input text-sm py-2" />
+                  <input type="number" value={recalcForm.matchday} onChange={e => setRecalcForm(p => ({ ...p, matchday: e.target.value }))}
+                    placeholder="Matchday" className="input text-sm py-2" />
+                  <input value={recalcForm.season} onChange={e => setRecalcForm(p => ({ ...p, season: e.target.value }))}
+                    placeholder="Season (e.g. 2026)" className="input text-sm py-2" />
+                  <button onClick={recalcSingleTeam} disabled={recalcSaving} className="btn-primary text-xs py-2 disabled:opacity-60">
+                    {recalcSaving ? "Recalculating…" : "Recalculate"}
+                  </button>
+                </div>
+                {recalcMessage && <p className={cn("text-xs mt-3", recalcMessage.type === "error" ? "text-red-500" : "text-zff-green")}>{recalcMessage.text}</p>}
+              </div>
+
               <div className="glass-card overflow-hidden">
                 <div className="flex items-center justify-between p-5 border-b border-slate-200">
                   <div className="min-w-0">
@@ -1269,9 +1332,9 @@ export default function AdminPage() {
                     {liveUpdateMatch === m.id && (
                       <div className="mt-3 flex items-center gap-2 justify-center bg-red-50 border border-red-200 rounded-lg p-3">
                         <span className="text-xs text-muted-foreground truncate max-w-[80px] text-right">{m.home_team}</span>
-                        <input type="number" min={0} value={liveUpdateForm.home} onChange={e => setLiveUpdateForm(p => ({ ...p, home: e.target.value }))} className="input w-16 text-center px-2 py-1.5 text-sm" placeholder="-" />
+                        <input type="number" min={0} max={999} value={liveUpdateForm.home} onChange={e => setLiveUpdateForm(p => ({ ...p, home: e.target.value }))} className="input w-16 text-center px-2 py-1.5 text-sm" placeholder="-" />
                         <span className="text-muted-foreground text-xs">—</span>
-                        <input type="number" min={0} value={liveUpdateForm.away} onChange={e => setLiveUpdateForm(p => ({ ...p, away: e.target.value }))} className="input w-16 text-center px-2 py-1.5 text-sm" placeholder="-" />
+                        <input type="number" min={0} max={999} value={liveUpdateForm.away} onChange={e => setLiveUpdateForm(p => ({ ...p, away: e.target.value }))} className="input w-16 text-center px-2 py-1.5 text-sm" placeholder="-" />
                         <span className="text-xs text-muted-foreground truncate max-w-[80px]">{m.away_team}</span>
                         <button onClick={() => saveLiveScoreUpdate(m.id)} disabled={liveUpdateSaving} className="btn-primary text-xs py-1.5 px-3 ml-2 disabled:opacity-60">
                           {liveUpdateSaving ? "Saving…" : "Update"}
@@ -1282,9 +1345,9 @@ export default function AdminPage() {
                     {scoreEntryMatch === m.id && (
                       <div className="mt-3 flex items-center gap-2 justify-center bg-slate-50 border border-slate-200 rounded-lg p-3">
                         <span className="text-xs text-muted-foreground truncate max-w-[80px] text-right">{m.home_team}</span>
-                        <input type="number" min={0} value={scoreEntryForm.home} onChange={e => setScoreEntryForm(p => ({ ...p, home: e.target.value }))} className="input w-16 text-center px-2 py-1.5 text-sm" placeholder="-" />
+                        <input type="number" min={0} max={999} value={scoreEntryForm.home} onChange={e => setScoreEntryForm(p => ({ ...p, home: e.target.value }))} className="input w-16 text-center px-2 py-1.5 text-sm" placeholder="-" />
                         <span className="text-muted-foreground text-xs">—</span>
-                        <input type="number" min={0} value={scoreEntryForm.away} onChange={e => setScoreEntryForm(p => ({ ...p, away: e.target.value }))} className="input w-16 text-center px-2 py-1.5 text-sm" placeholder="-" />
+                        <input type="number" min={0} max={999} value={scoreEntryForm.away} onChange={e => setScoreEntryForm(p => ({ ...p, away: e.target.value }))} className="input w-16 text-center px-2 py-1.5 text-sm" placeholder="-" />
                         <span className="text-xs text-muted-foreground truncate max-w-[80px]">{m.away_team}</span>
                         <button onClick={() => saveScoreEntry(m.id)} disabled={scoreEntrySaving} className="btn-primary text-xs py-1.5 px-3 ml-2 disabled:opacity-60">
                           {scoreEntrySaving ? "Saving…" : "Finish"}
@@ -1606,6 +1669,42 @@ export default function AdminPage() {
                   <button onClick={() => handleDeletePlayer(confirmDeletePlayer)} disabled={deletingPlayer}
                     className="flex-1 text-sm py-2.5 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors disabled:opacity-60">
                     {deletingPlayer ? "Deleting…" : "Delete"}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── Grant XP Modal ── */}
+      <AnimatePresence>
+        {grantXpUser && (
+          <>
+            <motion.div key="xp-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => !grantXpSaving && setGrantXpUser(null)}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" />
+            <motion.div key="xp-modal" initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-sm p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="font-bold text-zff-black flex items-center gap-2"><Zap className="w-4 h-4 text-zff-green" /> Grant XP</h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">Manually award XP to <span className="font-semibold text-zff-black">@{grantXpUser.username}</span></p>
+                  </div>
+                  <button onClick={() => setGrantXpUser(null)} disabled={grantXpSaving} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X className="w-4 h-4" /></button>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">XP amount</label>
+                  <input type="number" min={1} max={100000} value={grantXpAmount}
+                    onChange={e => setGrantXpAmount(e.target.value)}
+                    placeholder="e.g. 50" className="input text-sm py-2" />
+                </div>
+                {grantXpError && <p className="text-xs text-red-400 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" />{grantXpError}</p>}
+                <div className="flex gap-2 pt-1">
+                  <button onClick={() => setGrantXpUser(null)} disabled={grantXpSaving} className="btn-outline text-sm py-2.5 flex-1">Cancel</button>
+                  <button onClick={grantXp} disabled={grantXpSaving} className="btn-primary text-sm py-2.5 flex-1 disabled:opacity-60">
+                    {grantXpSaving ? "Granting…" : "Grant XP"}
                   </button>
                 </div>
               </div>

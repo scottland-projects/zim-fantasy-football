@@ -84,10 +84,34 @@ export async function saveFlagsAction(flags: Record<string, boolean>) {
   const { error, supabase } = await requireAdmin();
   if (error || !supabase) return { error: error ?? "Unknown error" };
 
+  // Fires the "Transfer Deadline Alerts" notification (type 'transfer',
+  // gated by user_settings.notifications.transferDeadlines via the
+  // trg_filter_notification_preference trigger) the moment an admin
+  // actually closes the window — this was the one Settings toggle with no
+  // producer that didn't already have a natural DB-trigger home, since
+  // there's no stored deadline timestamp to schedule against.
+  const { data: current } = await supabase.from("app_config").select("value").eq("key", "feature_flags").single();
+  const wasOpen = current?.value?.transferWindow !== false;
+  const nowClosed = flags.transferWindow === false;
+
   await supabase
     .from("app_config")
     .update({ value: flags, updated_at: new Date().toISOString() })
     .eq("key", "feature_flags");
+
+  if (wasOpen && nowClosed) {
+    const { data: profiles } = await supabase.from("profiles").select("id");
+    if (profiles?.length) {
+      await supabase.from("notifications").insert(
+        profiles.map((p: { id: string }) => ({
+          user_id: p.id,
+          title: "Transfer window closed 🔒",
+          body: "The fantasy transfer window is now closed until it reopens next matchday.",
+          type: "transfer",
+        }))
+      );
+    }
+  }
 
   return { success: true };
 }
@@ -237,6 +261,22 @@ export async function updateLiveScorePredictionOnlyAction(matchId: string, homeS
   await supabase.from("matches").update({ home_score: homeScore, away_score: awayScore }).eq("id", matchId);
 
   revalidatePath("/admin");
+  return { success: true };
+}
+
+// Was previously a direct client-side supabase.from("players").update(...)
+// call in manager/page.tsx — RLS (admin_write_players) already blocked
+// non-admin/manager writes, so it wasn't exploitable, but every other
+// privileged write in the app goes through a checked server action rather
+// than relying on RLS as the only backstop. This closes that gap.
+export async function togglePlayerInjuryAction(playerId: string, injured: boolean) {
+  const { error, supabase } = await requireAdminOrManager();
+  if (error || !supabase) return { error: error ?? "Unknown error" };
+
+  const { error: dbError } = await supabase.from("players").update({ is_injured: injured }).eq("id", playerId);
+  if (dbError) return { error: dbError.message };
+
+  revalidatePath("/manager");
   return { success: true };
 }
 
@@ -546,6 +586,49 @@ export async function adminResetPasswordAction(targetUserId: string, newPassword
   const admin = serviceRole();
   const { error: updateError } = await admin.auth.admin.updateUserById(targetUserId, { password: newPassword });
   if (updateError) return { error: updateError.message };
+  return { success: true };
+}
+
+// recalculate_single_team_points() existed in the DB, correctly role-gated,
+// but had no UI to trigger it — fixing one team's points after e.g. a late
+// transfer meant either redoing the whole matchday or hand-writing SQL.
+// Takes a username rather than a raw team id since there's no team browser
+// in the admin UI to pick one from.
+export async function recalculateSingleTeamAction(username: string, matchday: number, season: string) {
+  if (!username.trim()) return { error: "Username is required" };
+  if (!Number.isInteger(matchday) || matchday < 1) return { error: "Invalid matchday" };
+
+  const { error, supabase } = await requireAdmin();
+  if (error || !supabase) return { error: error ?? "Unknown error" };
+
+  const { data: profile } = await supabase.from("profiles").select("id").eq("username", username.trim()).single();
+  if (!profile) return { error: `No user @${username.trim()}` };
+
+  const { data: team } = await supabase.from("fantasy_teams").select("id").eq("user_id", profile.id).single();
+  if (!team) return { error: `@${username.trim()} has no fantasy team` };
+
+  const { data: points, error: rpcError } = await supabase.rpc("recalculate_single_team_points", {
+    p_team_id: team.id, p_matchday: matchday, p_season: season.trim() || "2026",
+  });
+  if (rpcError) return { error: rpcError.message };
+
+  revalidatePath("/admin");
+  return { success: true, points };
+}
+
+// grant_xp() existed in the DB, correctly role-gated, but had no UI to
+// trigger it — an admin's only option was hand-writing SQL in the
+// Supabase editor to manually reward a user.
+export async function grantXpAction(targetUserId: string, amount: number) {
+  if (!Number.isInteger(amount) || amount < 1 || amount > 100_000) return { error: "XP must be a whole number between 1 and 100,000" };
+
+  const { error, supabase } = await requireAdmin();
+  if (error || !supabase) return { error: error ?? "Unknown error" };
+
+  const { error: rpcError } = await supabase.rpc("grant_xp", { p_user_id: targetUserId, p_xp: amount });
+  if (rpcError) return { error: rpcError.message };
+
+  revalidatePath("/admin");
   return { success: true };
 }
 
