@@ -19,7 +19,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-zff-green/5 rounded-full blur-3xl" />
         <div className="absolute inset-0 pitch-bg opacity-30" />
       </div>
-      <div className={cn("relative z-10 w-full", isRegister ? "max-w-2xl" : "max-w-md")}>{children}</div>
+      <div className={cn("relative z-10 w-full", isRegister ? "max-w-3xl" : "max-w-md")}>{children}</div>
     </div>
   );
 }
