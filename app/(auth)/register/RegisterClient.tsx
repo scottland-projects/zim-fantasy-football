@@ -3,12 +3,56 @@
 import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Lock, User, ArrowRight, HelpCircle } from "lucide-react";
+import { Lock, User, ArrowRight, HelpCircle, Pencil } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { usernameSignUpAction } from "@/lib/actions/auth";
 import { RECOVERY_QUESTIONS } from "@/lib/recoveryQuestions";
+
+const CUSTOM = "__custom__";
+
+function QuestionField({
+  label, question, answer, onQuestionChange, onAnswerChange, otherQuestion,
+}: {
+  label: string;
+  question: string;
+  answer: string;
+  onQuestionChange: (q: string) => void;
+  onAnswerChange: (a: string) => void;
+  otherQuestion: string;
+}) {
+  const isCustom = !RECOVERY_QUESTIONS.includes(question);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <label className="text-xs font-medium text-muted-foreground">{label}</label>
+        <button
+          type="button"
+          onClick={() => onQuestionChange(isCustom ? (RECOVERY_QUESTIONS.find((q) => q !== otherQuestion) ?? RECOVERY_QUESTIONS[0]) : CUSTOM)}
+          className="text-xs text-zff-green font-medium hover:underline flex items-center gap-1"
+        >
+          {isCustom ? "Choose from list" : <><Pencil className="w-3 h-3" /> Write my own</>}
+        </button>
+      </div>
+      {isCustom ? (
+        <input
+          type="text" value={question === CUSTOM ? "" : question}
+          onChange={(e) => onQuestionChange(e.target.value)}
+          placeholder="Write your own question"
+          required minLength={6} maxLength={150}
+          className="input text-sm"
+        />
+      ) : (
+        <select value={question} onChange={(e) => onQuestionChange(e.target.value)} className="input text-sm">
+          {RECOVERY_QUESTIONS.map((q) => <option key={q} value={q}>{q}</option>)}
+        </select>
+      )}
+      <input type="text" value={answer} onChange={(e) => onAnswerChange(e.target.value)} placeholder="Your answer" required maxLength={100} className="input mt-2 text-sm" />
+    </div>
+  );
+}
 
 export default function RegisterClient() {
   const [loading, setLoading] = useState(false);
@@ -32,7 +76,12 @@ export default function RegisterClient() {
     // rate-limit checks) — reassure rather than let a static button read as hung.
     const slowTimer = setTimeout(() => setSlowLoading(true), 3000);
 
-    if (form.q1 === form.q2) {
+    if (form.q1 === CUSTOM || form.q2 === CUSTOM || !form.q1.trim() || !form.q2.trim()) {
+      setError("Finish writing both security questions.");
+      setLoading(false); clearTimeout(slowTimer); setSlowLoading(false);
+      return;
+    }
+    if (form.q1.trim().toLowerCase() === form.q2.trim().toLowerCase()) {
       setError("Pick two different security questions.");
       setLoading(false); clearTimeout(slowTimer); setSlowLoading(false);
       return;
@@ -40,7 +89,7 @@ export default function RegisterClient() {
 
     const result = await usernameSignUpAction(
       form.username.trim(), form.password, form.full_name.slice(0, 100),
-      form.q1, form.a1, form.q2, form.a2
+      form.q1.trim(), form.a1, form.q2.trim(), form.a2
     );
     if (result.error) { setError(result.error); setLoading(false); clearTimeout(slowTimer); setSlowLoading(false); return; }
 
@@ -76,23 +125,25 @@ export default function RegisterClient() {
         </div>
 
         <div className="pt-1 border-t border-slate-100">
-          <p className="text-xs font-semibold text-zff-black mt-4 mb-3 flex items-center gap-1.5">
+          <p className="text-xs font-semibold text-zff-black mt-4 mb-1.5 flex items-center gap-1.5">
             <HelpCircle className="w-3.5 h-3.5 text-zff-green" /> Security Questions
-            <span className="text-muted-foreground font-normal">— used to recover your account if you forget your password</span>
           </p>
-          <div className="space-y-3">
-            <div>
-              <select value={form.q1} onChange={(e) => setForm({ ...form, q1: e.target.value })} className="input text-sm">
-                {RECOVERY_QUESTIONS.map((q) => <option key={q} value={q}>{q}</option>)}
-              </select>
-              <input type="text" value={form.a1} onChange={(e) => setForm({ ...form, a1: e.target.value })} placeholder="Your answer" required maxLength={100} className="input mt-2 text-sm" />
-            </div>
-            <div>
-              <select value={form.q2} onChange={(e) => setForm({ ...form, q2: e.target.value })} className="input text-sm">
-                {RECOVERY_QUESTIONS.map((q) => <option key={q} value={q}>{q}</option>)}
-              </select>
-              <input type="text" value={form.a2} onChange={(e) => setForm({ ...form, a2: e.target.value })} placeholder="Your answer" required maxLength={100} className="input mt-2 text-sm" />
-            </div>
+          <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+            These are the only way to recover your account if you forget your password — we can&apos;t help beyond them, so
+            {" "}<span className="font-medium text-zff-black">keep your answers to yourself</span>. If our suggested questions
+            feel too easy to guess, use &quot;Write my own&quot; to set your own instead.
+          </p>
+          <div className="space-y-4">
+            <QuestionField
+              label="Question 1" question={form.q1} answer={form.a1} otherQuestion={form.q2}
+              onQuestionChange={(q) => setForm({ ...form, q1: q })}
+              onAnswerChange={(a) => setForm({ ...form, a1: a })}
+            />
+            <QuestionField
+              label="Question 2" question={form.q2} answer={form.a2} otherQuestion={form.q1}
+              onQuestionChange={(q) => setForm({ ...form, q2: q })}
+              onAnswerChange={(a) => setForm({ ...form, a2: a })}
+            />
           </div>
         </div>
 

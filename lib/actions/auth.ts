@@ -72,6 +72,12 @@ export async function phoneSignUpAction(email: string, password: string, usernam
 // the questions fails after the account was already created, the account
 // is rolled back so the user gets a clean error and can just try again,
 // rather than being left with an unrecoverable account.
+// Every check below is re-validated here even though the form already
+// enforces most of it client-side — the client-side rules (minLength,
+// maxLength, pattern, disabled buttons) are only a UX convenience and are
+// trivially bypassed by anyone calling this server action directly (Burp
+// Suite, curl, a modified fetch call), so nothing here can be trusted to
+// have already been checked.
 export async function usernameSignUpAction(
   username: string, password: string, fullName: string,
   q1: string, a1: string, q2: string, a2: string
@@ -80,8 +86,17 @@ export async function usernameSignUpAction(
   if (!/^[a-z0-9_]{3,20}$/.test(clean)) {
     return { error: "Username must be 3-20 characters: letters, numbers, and underscores only." };
   }
-  if (!q1 || !q2 || q1 === q2) return { error: "Pick two different security questions." };
-  if (!a1.trim() || !a2.trim()) return { error: "Please answer both security questions." };
+  if (!password || password.length < 8) return { error: "Password must be at least 8 characters." };
+
+  const question1 = q1.trim(), question2 = q2.trim();
+  const answer1 = a1.trim(), answer2 = a2.trim();
+  if (question1.length < 6 || question1.length > 150 || question2.length < 6 || question2.length > 150) {
+    return { error: "Security questions must be 6-150 characters." };
+  }
+  if (question1.toLowerCase() === question2.toLowerCase()) return { error: "Pick two different security questions." };
+  if (!answer1 || answer1.length > 100 || !answer2 || answer2.length > 100) {
+    return { error: "Please answer both security questions (100 characters max)." };
+  }
 
   const admin = serviceRole();
   const rateLimitError = await checkSignupRateLimit(admin);
@@ -92,12 +107,12 @@ export async function usernameSignUpAction(
     email,
     password,
     email_confirm: true,
-    user_metadata: { username: clean, full_name: fullName },
+    user_metadata: { username: clean, full_name: fullName.trim().slice(0, 100) },
   });
   if (error) return { error: error.message.toLowerCase().includes("already") ? "That username is already taken." : "Unable to create account. Please try again." };
 
   const { error: qError } = await admin.rpc("set_recovery_questions", {
-    p_user_id: data.user!.id, p_q1: q1, p_a1: a1, p_q2: q2, p_a2: a2,
+    p_user_id: data.user!.id, p_q1: question1, p_a1: answer1, p_q2: question2, p_a2: answer2,
   });
   if (qError) {
     await admin.auth.admin.deleteUser(data.user!.id);
@@ -126,13 +141,17 @@ async function checkRecoveryRateLimit(admin: ReturnType<typeof serviceRole>, use
 
 // Step 1 of account recovery — looks up which two questions a username set
 // at signup. Returns only the question text, never anything answer-related.
+// Counts against the same recovery_attempts budget as the actual answer
+// check below, so this can't be hammered separately to enumerate usernames
+// indefinitely without ever tripping a limit.
 export async function getRecoveryQuestionsAction(username: string) {
-  const clean = username.trim().toLowerCase();
+  const clean = username.trim().toLowerCase().slice(0, 100);
   if (!clean) return { error: "Enter your username" };
 
   const admin = serviceRole();
   const rateLimitError = await checkRecoveryRateLimit(admin, clean);
   if (rateLimitError) return { error: rateLimitError };
+  await admin.from("recovery_attempts").insert({ username: clean });
 
   const { data, error } = await admin.rpc("get_recovery_questions", { p_username: clean });
   if (error || !data?.length) return { error: "No account found with that username, or it has no recovery questions set up." };
@@ -141,11 +160,15 @@ export async function getRecoveryQuestionsAction(username: string) {
 
 // Step 2 — verifies both answers and, if correct, sets a new password
 // directly via the Admin API (verify_recovery_answers never touches
-// auth.users itself, just returns the user id on a match).
+// auth.users itself, just returns the user id on a match). Answers are
+// length-capped before being passed anywhere — not a real cost concern
+// since bcrypt truncates at 72 bytes internally either way, but rejecting
+// clearly-invalid input early is cheaper than round-tripping it to Postgres.
 export async function recoverAccountAction(username: string, answer1: string, answer2: string, newPassword: string) {
   if (!newPassword || newPassword.length < 8) return { error: "Password must be at least 8 characters" };
+  if (!answer1 || answer1.length > 100 || !answer2 || answer2.length > 100) return { error: "One or both answers are incorrect." };
 
-  const clean = username.trim().toLowerCase();
+  const clean = username.trim().toLowerCase().slice(0, 100);
   const admin = serviceRole();
   const rateLimitError = await checkRecoveryRateLimit(admin, clean);
   if (rateLimitError) return { error: rateLimitError };
