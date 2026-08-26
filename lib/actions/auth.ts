@@ -23,20 +23,13 @@ async function requestIp(): Promise<string> {
 const SIGNUP_MAX_PER_IP = 5;
 const SIGNUP_WINDOW_MINUTES = 60;
 
-// Phone-only signup uses a synthetic "@zff.internal" email that can't
-// receive mail, so it can never complete Supabase's normal email-confirmation
-// flow (that previously left these accounts permanently unconfirmed and
-// unable to log in). There's no real email to verify here, so the service
-// role creates the account pre-confirmed instead.
-//
-// Creating users via the Admin API bypasses GoTrue's own signup rate limits
-// (those only apply to the public signup endpoint) — nothing else throttled
-// this path, so a script could mint unlimited fake accounts by varying the
-// phone number each call. Rate-limited by IP below.
-export async function phoneSignUpAction(email: string, password: string, username: string, fullName: string, phone: string) {
-  const admin = serviceRole();
+// Shared by every synthetic-email signup path below (phone, username-only).
+// Creating users via the Admin API bypasses GoTrue's own public-signup rate
+// limits entirely — nothing else throttles this path, so a script could
+// mint unlimited fake accounts by varying the identifier each call. This
+// per-IP limit is the only thing standing in for that.
+async function checkSignupRateLimit(admin: ReturnType<typeof serviceRole>): Promise<string | null> {
   const ip = await requestIp();
-
   const since = new Date(Date.now() - SIGNUP_WINDOW_MINUTES * 60 * 1000).toISOString();
   const { count } = await admin
     .from("signup_attempts")
@@ -45,10 +38,21 @@ export async function phoneSignUpAction(email: string, password: string, usernam
     .gte("created_at", since);
 
   if ((count ?? 0) >= SIGNUP_MAX_PER_IP) {
-    return { error: "Too many accounts created recently. Please try again later." };
+    return "Too many accounts created recently. Please try again later.";
   }
-
   await admin.from("signup_attempts").insert({ ip_address: ip });
+  return null;
+}
+
+// Phone-only signup uses a synthetic "@zff.internal" email that can't
+// receive mail, so it can never complete Supabase's normal email-confirmation
+// flow (that previously left these accounts permanently unconfirmed and
+// unable to log in). There's no real email to verify here, so the service
+// role creates the account pre-confirmed instead.
+export async function phoneSignUpAction(email: string, password: string, username: string, fullName: string, phone: string) {
+  const admin = serviceRole();
+  const rateLimitError = await checkSignupRateLimit(admin);
+  if (rateLimitError) return { error: rateLimitError };
 
   const { data, error } = await admin.auth.admin.createUser({
     email,
@@ -58,6 +62,33 @@ export async function phoneSignUpAction(email: string, password: string, usernam
   });
   if (error) return { error: error.message.toLowerCase().includes("already") ? "An account with these details already exists." : "Unable to create account. Please try again." };
   return { success: true, userId: data.user?.id };
+}
+
+// Username-only signup — no email or phone collected at all. Same
+// pre-confirmed synthetic-email trick as the phone path above, keyed by
+// username instead. This means there is currently no account-recovery path
+// (no "forgot password") for these accounts short of an admin resetting it
+// via the Admin panel — a deliberate tradeoff for a simpler signup, not an
+// oversight.
+export async function usernameSignUpAction(username: string, password: string, fullName: string) {
+  const clean = username.trim().toLowerCase();
+  if (!/^[a-z0-9_]{3,20}$/.test(clean)) {
+    return { error: "Username must be 3-20 characters: letters, numbers, and underscores only." };
+  }
+
+  const admin = serviceRole();
+  const rateLimitError = await checkSignupRateLimit(admin);
+  if (rateLimitError) return { error: rateLimitError };
+
+  const email = `${clean}@zff.internal`;
+  const { data, error } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { username: clean, full_name: fullName },
+  });
+  if (error) return { error: error.message.toLowerCase().includes("already") ? "That username is already taken." : "Unable to create account. Please try again." };
+  return { success: true, userId: data.user?.id, email };
 }
 
 export async function signUp(formData: FormData) {
