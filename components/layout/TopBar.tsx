@@ -122,7 +122,7 @@ export function TopBar({ title, subtitle, rightContent }: TopBarProps) {
       initial={{ y: -10, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       className="flex items-center justify-between px-4 sm:px-6 lg:px-8 h-20 border-b border-slate-200
-                 bg-white sticky top-0 z-20 gap-4"
+                 bg-gradient-to-r from-white to-zff-green/[0.025] sticky top-0 z-20 gap-4"
     >
       <div className="flex items-center gap-3 min-w-0">
         <button

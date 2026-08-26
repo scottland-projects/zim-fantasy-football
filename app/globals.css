@@ -6,24 +6,24 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+    --background: 150 20% 98%;
+    --foreground: 160 25% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 160 25% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 160 25% 11%;
     --primary: 224 76% 48%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --secondary: 150 18% 96%;
+    --secondary-foreground: 160 25% 11%;
+    --muted: 150 18% 96%;
+    --muted-foreground: 153 10% 46%;
     --accent: 224 76% 48%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
+    --border: 150 14% 91%;
+    --input: 150 14% 91%;
     --ring: 224 76% 48%;
     --radius: 0.75rem;
   }
@@ -41,8 +41,8 @@
     overflow-x: hidden;
     @apply bg-slate-50 text-zff-black font-sans antialiased;
     background-image:
-      radial-gradient(ellipse at 20% 10%, rgba(21,128,61,0.04) 0%, transparent 50%),
-      radial-gradient(ellipse at 80% 80%, rgba(59,130,246,0.03) 0%, transparent 50%);
+      radial-gradient(ellipse at 20% 10%, rgba(21,128,61,0.05) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 80%, rgba(21,128,61,0.04) 0%, transparent 50%);
   }
 
   ::-webkit-scrollbar { @apply w-1.5 h-1.5; }

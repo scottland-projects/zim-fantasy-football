@@ -11,6 +11,28 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Tailwind's default `slate` is a cool blue-gray (hue ~215°), which
+        // is what made every border/background/muted-text across the app
+        // read as flat, cold gray despite the green brand identity — these
+        // utilities (bg-slate-50, border-slate-200, text-slate-400, etc.)
+        // are used directly in dozens of components, so retinting the scale
+        // itself here (hue shifted to ~150-160°, a desaturated sage) carries
+        // the same warmth through the whole app with no component changes.
+        // Lightness/contrast steps are kept close to the originals so
+        // nothing regresses on readability — only the hue moves.
+        slate: {
+          50:  "hsl(150, 20%, 98%)",
+          100: "hsl(150, 18%, 96%)",
+          200: "hsl(150, 14%, 91%)",
+          300: "hsl(150, 12%, 83%)",
+          400: "hsl(152, 10%, 64%)",
+          500: "hsl(153, 10%, 46%)",
+          600: "hsl(155, 12%, 35%)",
+          700: "hsl(155, 15%, 27%)",
+          800: "hsl(158, 20%, 17%)",
+          900: "hsl(160, 25%, 11%)",
+          950: "hsl(162, 35%, 6%)",
+        },
         // Africa Fantasy brand colors — green & gold, deliberately not
         // tied to any single club's colors (an independent platform covering
         // every Zimbabwean team shouldn't visually read as "belonging" to one).
