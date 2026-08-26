@@ -153,26 +153,74 @@ function TermsOfServiceContent() {
             </ul>
           </section>
 
+          {/* 7A */}
+          <section>
+            <h2 className="text-base font-bold text-zff-black mb-3">7A. Release Regarding Other Users</h2>
+            <p>
+              The Platform includes community features (chat, groups, and polls) where you may interact with other
+              users. You are solely responsible for your own interactions with other users. To the fullest extent
+              permitted by law, you release OMNI Global from any claims, demands, or damages of any kind arising out
+              of or connected with disputes with, or the conduct of, other users of the Platform.
+            </p>
+          </section>
+
           {/* 8 */}
           <section>
             <h2 className="text-base font-bold text-zff-black mb-3">8. Disclaimer of Warranties</h2>
             <p>
-              The Platform is provided "as is" and "as available" without warranties of any kind, whether express or
-              implied. We do not warrant that the Platform will be uninterrupted, error-free, or that match statistics
-              will always be entered without delay or error. Fantasy points and standings are informational and are
-              not a substitute for official match records.
+              The Platform is provided "as is" and "as available" without warranties of any kind, whether express,
+              implied, or statutory, including but not limited to implied warranties of merchantability, fitness for
+              a particular purpose, title, and non-infringement, to the fullest extent permitted by law. We do not
+              warrant that the Platform will be uninterrupted, secure, or error-free, that any defect will be
+              corrected, or that match statistics, fixtures, or results will always be entered accurately or without
+              delay. Fantasy points and standings are informational and for entertainment purposes only, and are not
+              a substitute for official match records. We make no warranty regarding, and are not responsible for,
+              the conduct or content of any other user or any third party. You use the Platform at your own risk.
             </p>
           </section>
 
           {/* 9 */}
           <section>
             <h2 className="text-base font-bold text-zff-black mb-3">9. Limitation of Liability</h2>
-            <p>
-              To the maximum extent permitted by law, OMNI Global shall not be liable for any indirect, incidental, or
-              consequential damages arising from your use of the Platform. Our total liability for any claim relating
-              to the Platform shall not exceed the amount you have paid us in the twelve months preceding the claim
-              (which, given free entry, will typically be zero).
+            <p className="mb-3">
+              To the maximum extent permitted by law, OMNI Global, its directors, officers, employees, agents,
+              contractors, partners, and licensors shall not be liable for any indirect, incidental, special,
+              consequential, exemplary, or punitive damages, including loss of profits, data, goodwill, or other
+              intangible losses, arising from or relating to: your access to or use of, or inability to access or
+              use, the Platform; any conduct or content of any other user or third party on the Platform; any
+              unauthorised access to or alteration of your data; or any interruption, suspension, or termination of
+              the Platform — even if we have been advised of the possibility of such damages.
             </p>
+            <p>
+              Our total aggregate liability for any claim arising under or relating to these Terms or the Platform
+              shall not exceed the greater of (i) the amount you have paid us in the twelve months preceding the
+              claim (which, given free entry, will typically be zero), or (ii) USD $10 (ten United States dollars).
+              Nothing in these Terms excludes or limits any liability that cannot lawfully be excluded or limited
+              under applicable law, including liability for death or personal injury caused by negligence, or for
+              fraud.
+            </p>
+          </section>
+
+          {/* 9A */}
+          <section>
+            <h2 className="text-base font-bold text-zff-black mb-3">9A. Indemnification</h2>
+            <p>
+              You agree to indemnify, defend, and hold harmless OMNI Global and its directors, officers, employees,
+              agents, and licensors from and against any claims, liabilities, damages, losses, costs, and expenses
+              (including reasonable legal fees) arising out of or in any way connected with: (a) your access to or
+              use of the Platform; (b) your violation of these Terms; (c) your violation of any law or the rights of
+              a third party; or (d) any content you submit, post, or transmit through the Platform.
+            </p>
+          </section>
+
+          {/* 9B */}
+          <section>
+            <h2 className="text-base font-bold text-zff-black mb-3">9B. General Provisions</h2>
+            <p className="mb-2"><strong>Force Majeure.</strong> We are not liable for any failure or delay in performance resulting from causes beyond our reasonable control, including natural disasters, power or internet outages, labour disputes, or governmental action.</p>
+            <p className="mb-2"><strong>Severability.</strong> If any provision of these Terms is found unenforceable, that provision will be limited or eliminated to the minimum extent necessary, and the remaining provisions will remain in full force and effect.</p>
+            <p className="mb-2"><strong>No Waiver.</strong> Our failure to enforce any right or provision of these Terms will not be considered a waiver of that right or provision.</p>
+            <p className="mb-2"><strong>Entire Agreement.</strong> These Terms, together with our Privacy Policy, constitute the entire agreement between you and OMNI Global regarding the Platform and supersede any prior agreements.</p>
+            <p><strong>Assignment.</strong> We may assign these Terms, in whole or in part, at any time without notice. You may not assign these Terms without our prior written consent.</p>
           </section>
 
           {/* 10 */}
