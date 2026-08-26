@@ -161,7 +161,7 @@ export default function RegisterClient() {
         </div>
 
         <p className="text-xs text-muted-foreground text-center">
-          By creating an account you agree to the{" "}
+          By creating an account you confirm that you are at least 16 years old, and agree to the{" "}
           <Link href="/terms" target="_blank" className="text-zff-green hover:underline font-medium">Terms of Service</Link>
           {" "}and{" "}
           <Link href="/privacy" target="_blank" className="text-zff-green hover:underline font-medium">Privacy Policy</Link>

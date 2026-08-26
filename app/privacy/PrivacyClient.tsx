@@ -35,7 +35,8 @@ function PrivacyPolicyContent() {
               Africa Fantasy ("<strong>the Platform</strong>") is owned and operated by <strong>OMNI Global</strong>
               ("<strong>we</strong>", "<strong>us</strong>", "<strong>our</strong>"). OMNI Global is the data controller
               responsible for personal information collected through the Platform. By creating an account or using the
-              Platform you agree to the practices described in this Privacy Policy.
+              Platform you agree to the practices described in this Privacy Policy and to our{" "}
+              <Link href="/terms" className="text-zff-green hover:underline">Terms of Service</Link>.
             </p>
           </section>
 
@@ -195,9 +196,11 @@ function PrivacyPolicyContent() {
           <section>
             <h2 className="text-base font-bold text-zff-black mb-3">8. Children&apos;s Privacy</h2>
             <p>
-              The Platform is not directed at children under 13 years of age. We do not knowingly collect personal data
-              from children under 13. If you believe a child has provided us with personal data, please contact us and
-              we will delete it promptly.
+              The Platform is not directed at, and accounts may not be created by, anyone under 16 years of age (see
+              Section 3 of our{" "}
+              <Link href="/terms" className="text-zff-green hover:underline">Terms of Service</Link>). We do not
+              knowingly collect personal data from anyone under 16. If you believe a child has provided us with
+              personal data, please contact us and we will delete it promptly.
             </p>
           </section>
 
