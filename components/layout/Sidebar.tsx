@@ -59,7 +59,7 @@ function SidebarContent({ username, level, xp, avatarUrl, isAdmin, isManager, on
   return (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+      <div className="h-20 px-6 border-b border-slate-200 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Logo size={44} className="shrink-0" />
           <div>
