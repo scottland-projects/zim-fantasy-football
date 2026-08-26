@@ -54,7 +54,7 @@
 @layer components {
   /* ── Cards ── */
   .glass-card {
-    @apply bg-white border border-zff-black-border rounded-2xl shadow-glass;
+    @apply bg-white border border-zff-green/10 rounded-2xl shadow-glass;
   }
   .glass-card-hover {
     @apply glass-card transition-all duration-300 hover:border-zff-green/20 hover:shadow-card-hover;

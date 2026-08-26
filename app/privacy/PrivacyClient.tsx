@@ -24,7 +24,7 @@ function PrivacyPolicyContent() {
         </div>
 
         {/* Policy card */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 sm:p-10 space-y-8 text-sm text-slate-700 leading-relaxed">
+        <div className="bg-white border border-zff-green/12 rounded-2xl shadow-sm p-8 sm:p-10 space-y-8 text-sm text-slate-700 leading-relaxed">
 
           {/* 1 */}
           <section>
