@@ -144,7 +144,7 @@ export function Sidebar(props: SidebarProps) {
       <motion.aside
         initial={{ x: -20, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
-        className="hidden lg:flex flex-col fixed left-0 top-0 h-screen w-64 bg-gradient-to-b from-white to-zff-green/[0.025] border-r border-slate-200 z-30"
+        className="hidden lg:flex flex-col fixed left-0 top-0 h-screen w-64 bg-white border-r border-slate-200 z-30"
       >
         <SidebarContent {...props} />
       </motion.aside>
@@ -169,7 +169,7 @@ export function Sidebar(props: SidebarProps) {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="lg:hidden fixed left-0 top-0 h-screen w-72 bg-gradient-to-b from-white to-zff-green/[0.025] border-r border-slate-200 z-50 flex flex-col"
+              className="lg:hidden fixed left-0 top-0 h-screen w-72 bg-white border-r border-slate-200 z-50 flex flex-col"
             >
               <SidebarContent {...props} onNavigate={close} />
             </motion.aside>
