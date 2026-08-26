@@ -59,7 +59,7 @@ export default function RegisterClient() {
   const [slowLoading, setSlowLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
-    username: "", password: "", full_name: "",
+    username: "", password: "", confirmPassword: "", full_name: "",
     q1: RECOVERY_QUESTIONS[0], a1: "",
     q2: RECOVERY_QUESTIONS[1], a2: "",
   });
@@ -76,6 +76,11 @@ export default function RegisterClient() {
     // rate-limit checks) — reassure rather than let a static button read as hung.
     const slowTimer = setTimeout(() => setSlowLoading(true), 3000);
 
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords don't match.");
+      setLoading(false); clearTimeout(slowTimer); setSlowLoading(false);
+      return;
+    }
     if (form.q1 === CUSTOM || form.q2 === CUSTOM || !form.q1.trim() || !form.q2.trim()) {
       setError("Finish writing both security questions.");
       setLoading(false); clearTimeout(slowTimer); setSlowLoading(false);
@@ -124,6 +129,10 @@ export default function RegisterClient() {
             <div>
               <label className="label">Password</label>
               <div className="relative"><Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="At least 8 characters" required minLength={8} className="input pl-10" /></div>
+            </div>
+            <div>
+              <label className="label">Confirm Password</label>
+              <div className="relative"><Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="password" value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} placeholder="Re-enter your password" required minLength={8} className="input pl-10" /></div>
             </div>
           </div>
 
