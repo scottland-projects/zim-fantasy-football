@@ -3,7 +3,7 @@ import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://africa-fantasy-club.vercel.app"),
+  metadataBase: new URL("https://africafantasy.club"),
   title: "Africa Fantasy",
   description: "The home for football, cricket and rugby predictions and fantasy gaming across Africa",
   openGraph: {
