@@ -6,6 +6,8 @@ import { TopBar } from "@/components/layout/TopBar";
 import { BarChart2, CheckCircle2, Clock, TrendingUp, TrendingDown, Table2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn, getPositionColor } from "@/lib/utils";
+import { useFeatureFlag } from "@/lib/hooks/useFeatureFlag";
+import { FeatureDisabled } from "@/components/ui/FeatureDisabled";
 
 type Sport = "football" | "cricket" | "rugby";
 type Country = "Zimbabwe" | "South Africa" | "Botswana";
@@ -130,6 +132,7 @@ function buildTeamStats(finished: Match[]): TeamStat[] {
 }
 
 export default function MatchStatsPage() {
+  const matchStatsEnabled = useFeatureFlag("matchStats");
   const [sport, setSport]           = useState<Sport>("football");
   const [country, setCountry]       = useState<Country>("Zimbabwe");
   const [matches, setMatches]       = useState<Match[]>([]);
@@ -175,6 +178,10 @@ export default function MatchStatsPage() {
     load();
     return () => { cancelled = true; };
   }, [sport, country]);
+
+  if (!matchStatsEnabled) {
+    return <FeatureDisabled title="Match Stats" message="Results and player stats are temporarily paused. Check Score Predictions or the Live Center instead." />;
+  }
 
   const results  = matches.filter(m => m.status === "finished");
   const fixtures = matches.filter(m => m.status !== "finished").reverse();

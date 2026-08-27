@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 const DEFAULT_FLAGS: Record<string, boolean> = {
   liveScoring: true, transferWindow: true, chat: true, polls: true,
   leagueCreation: true, notifications: true, marketplace: true, achievements: true,
-  fantasyTeams: true, scorePredictions: true,
+  fantasyTeams: true, scorePredictions: true, matchStats: true,
 };
 
 type Flags = typeof DEFAULT_FLAGS;

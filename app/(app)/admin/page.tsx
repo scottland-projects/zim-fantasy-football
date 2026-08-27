@@ -60,6 +60,7 @@ const FLAG_DEFS = [
   { key: "notifications",   label: "Push Notifications", desc: "Send in-app notifications to all users" },
   { key: "marketplace",     label: "Player Market",      desc: "Show the football fantasy buy/sell player market page" },
   { key: "achievements",    label: "Achievements",       desc: "Award XP badges and trophies to users" },
+  { key: "matchStats",      label: "Match Stats",        desc: "Show the results/fixtures & player stats page (football only, no cricket/rugby equivalent yet)" },
 ];
 
 export default function AdminPage() {
@@ -210,7 +211,7 @@ export default function AdminPage() {
   const [flags, setFlags] = useState<Record<string, boolean>>({
     liveScoring: true, transferWindow: true, chat: true, polls: true,
     leagueCreation: true, notifications: true, marketplace: true, achievements: true,
-    fantasyTeams: true, scorePredictions: true,
+    fantasyTeams: true, scorePredictions: true, matchStats: true,
   });
   const [flagSaved, setFlagSaved]   = useState(false);
   const [flagSaving, setFlagSaving] = useState(false);
