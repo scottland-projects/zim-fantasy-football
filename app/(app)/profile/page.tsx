@@ -71,14 +71,13 @@ export default function ProfilePage() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const sb = supabase as any;
 
-        const [{ data }, { data: achData }, { data: teamData }, { data: preds }] = await Promise.all([
+        const [{ data }, { data: achData }, { data: preds }] = await Promise.all([
           sb.from("profiles").select("username, full_name, avatar_url, xp, level, fantasy_points, favorite_player, supporter_branch, bio").eq("id", user.id).single(),
           sb.from("achievements").select("*").eq("user_id", user.id),
-          sb.from("fantasy_teams")
-            .select("id, fantasy_team_players(player_id, is_starting, fantasy_team_id)")
+          sb.from("score_predictions")
+            .select("points_earned, matches(matchday, sport, kickoff_time)")
             .eq("user_id", user.id)
-            .maybeSingle(),
-          sb.from("score_predictions").select("points_earned").eq("user_id", user.id).not("points_earned", "is", null),
+            .not("points_earned", "is", null),
         ]);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setPredictionPoints((preds ?? []).reduce((s: number, p: any) => s + p.points_earned, 0));
@@ -105,25 +104,34 @@ export default function ProfilePage() {
           setTrophies((achData as any[]).map((a: any) => ({ name: a.badge_name, desc: a.badge_description, icon: a.badge_icon, date: new Date(a.unlocked_at).toLocaleDateString("en-GB", { month: "short", year: "numeric" }) })));
         }
 
-        // Points history per matchday via player_match_stats for this team's starters
-        if (teamData?.id) {
-          const { data: history } = await sb
-            .from("player_match_stats")
-            .select("fantasy_points, matches(matchday)")
-            .in("player_id", (teamData.fantasy_team_players ?? [])
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              .filter((p: any) => p.is_starting).map((p: any) => p.player_id))
-            .order("matches(matchday)", { ascending: true });
-          if (history && history.length > 0) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const byMatchday: Record<number, number> = {};
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (history as any[]).forEach((r: any) => {
-              const md: number = r.matches?.matchday ?? 0;
-              byMatchday[md] = (byMatchday[md] ?? 0) + (r.fantasy_points ?? 0);
-            });
-            setPointsHistory(Object.entries(byMatchday).sort(([a],[b]) => Number(a)-Number(b)).map(([md, pts]) => ({ md: `MD${md}`, pts: pts as number })));
-          }
+        // Prediction points per matchday — grouped by (sport, matchday) since
+        // each sport runs its own independent matchday sequence, then sorted
+        // chronologically by kickoff so the chart reads left-to-right over
+        // time. Was previously fantasy-team weekly points, which stayed
+        // permanently empty once Fantasy Teams was disabled and no squad
+        // could ever exist; Score Predictions is the live game mode instead.
+        if (preds && preds.length > 0) {
+          const SPORT_EMOJI: Record<string, string> = { football: "⚽", cricket: "🏏", rugby: "🏉" };
+          const byGroup: Record<string, { pts: number; kickoff: string }> = {};
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (preds as any[]).forEach((p: any) => {
+            const sport = p.matches?.sport ?? "football";
+            const md = p.matches?.matchday ?? 0;
+            const key = `${sport}-${md}`;
+            const existing = byGroup[key];
+            byGroup[key] = {
+              pts: (existing?.pts ?? 0) + (p.points_earned ?? 0),
+              kickoff: p.matches?.kickoff_time ?? existing?.kickoff ?? "",
+            };
+          });
+          setPointsHistory(
+            Object.entries(byGroup)
+              .sort(([, a], [, b]) => a.kickoff.localeCompare(b.kickoff))
+              .map(([key, v]) => {
+                const [sport, md] = key.split("-");
+                return { md: `${SPORT_EMOJI[sport] ?? ""} MD${md}`, pts: v.pts };
+              })
+          );
         }
       } catch { /* show empty state */
       } finally {
@@ -261,10 +269,10 @@ export default function ProfilePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* Points History Chart */}
           <div className="col-span-1 lg:col-span-2 glass-card p-5">
-            <h2 className="section-header mb-1">Fantasy Points History</h2>
-            <p className="section-subtitle mb-4">Your fantasy team&apos;s performance across all matchdays</p>
+            <h2 className="section-header mb-1">Prediction Points History</h2>
+            <p className="section-subtitle mb-4">Your score prediction points across every matchday, all sports</p>
             {pointsHistory.length === 0 ? (
-              <div className="flex items-center justify-center h-[220px] text-sm text-muted-foreground">No matchday data yet</div>
+              <div className="flex items-center justify-center h-[220px] text-sm text-muted-foreground">No scored predictions yet</div>
             ) : (
             <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={pointsHistory}>
